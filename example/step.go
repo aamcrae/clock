@@ -49,14 +49,8 @@ func main() {
 			log.Fatalf("Pin %d: %v", *gp, err)
 		}
 	}
-	stepperA, err := io.NewStepper(halfStepsRev, pins[0], pins[1], pins[2], pins[3])
-	if err != nil {
-		log.Fatalf("stepper: %v", err)
-	}
-	stepperB, err := io.NewStepper(halfStepsRev, pins[4], pins[5], pins[6], pins[7])
-	if err != nil {
-		log.Fatalf("stepper: %v", err)
-	}
+	stepperA := io.NewStepper(halfStepsRev, pins[0], pins[1], pins[2], pins[3])
+	stepperB := io.NewStepper(halfStepsRev, pins[4], pins[5], pins[6], pins[7])
 	defer stepperA.Close()
 	defer stepperB.Close()
 	stepperA.Restore(0)

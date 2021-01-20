@@ -15,10 +15,10 @@
 package io
 
 import (
-	"fmt"
 	"time"
 )
 
+// Setter is an interface for setting an output value on a GPIO
 type Setter interface {
 	Set(int) error
 }
@@ -50,12 +50,9 @@ var sequence = [][]int{
 	[]int{1, 0, 0, 1},
 }
 
-// NewStepper creates and initialises a Stepper
+// NewStepper creates and initialises a Stepper struct
 // halfSteps is the number of half steps per revolution.
-func NewStepper(halfSteps int, pin1, pin2, pin3, pin4 Setter) (*Stepper, error) {
-	if halfSteps <= 30 {
-		return nil, fmt.Errorf("invalid steps per revolution")
-	}
+func NewStepper(halfSteps int, pin1, pin2, pin3, pin4 Setter) *Stepper {
 	s := new(Stepper)
 	s.factor = float64(time.Second.Nanoseconds()*60) / float64(halfSteps)
 	s.pin1 = pin1
@@ -65,16 +62,14 @@ func NewStepper(halfSteps int, pin1, pin2, pin3, pin4 Setter) (*Stepper, error) 
 	s.mChan = make(chan msg, 20)
 	s.stopChan = make(chan bool)
 	go s.handler()
-	return s, nil
+	return s
 }
 
 // Close disables the outputs and frees resources
 func (s *Stepper) Close() {
-	if s.mChan != nil {
-		s.Stop()
-		close(s.mChan)
-		close(s.stopChan)
-	}
+	s.Stop()
+	close(s.mChan)
+	close(s.stopChan)
 }
 
 // Save returns the current sequence index.
