@@ -25,8 +25,6 @@ import (
 	"github.com/aamcrae/clock/io"
 )
 
-const halfStepsRev = 2048 * 2
-
 var gpios = []*int{
 	flag.Int("a1", 4, "GPIO pin for motor output 1"),
 	flag.Int("a2", 17, "GPIO pin for motor output 2"),
@@ -52,6 +50,7 @@ type FakeMover struct {
 
 var startTime = flag.String("time", "3:04:05", "Current time on clock face")
 var speed = flag.Float64("speed", 4.0, "Stepper speed in RPM")
+var halfSteps = flag.Float64("steps", 2048 * 2, "Half steps in a revolution")
 
 func main() {
 	flag.Parse()
@@ -68,14 +67,14 @@ func main() {
 		}
 		defer pins[i].Close()
 	}
-	mh := &StepperMover{"hours", io.NewStepper(halfStepsRev, pins[4], pins[5], pins[6], pins[7]), *speed, 0}
-	hour := NewHand("hours", time.Hour*12, mh, time.Minute*5, halfStepsRev)
+	mh := &StepperMover{"hours", io.NewStepper(*halfSteps, pins[4], pins[5], pins[6], pins[7]), *speed, 0}
+	hour := NewHand("hours", time.Hour*12, mh, time.Minute*5, int(*halfSteps))
 
-	mm := &StepperMover{"minutes", io.NewStepper(halfStepsRev, pins[0], pins[1], pins[2], pins[3]), *speed, 0}
-	min := NewHand("minutes", time.Hour, mm, time.Second*10, halfStepsRev)
+	mm := &StepperMover{"minutes", io.NewStepper(*halfSteps, pins[0], pins[1], pins[2], pins[3]), *speed, 0}
+	min := NewHand("minutes", time.Hour, mm, time.Second*10, int(*halfSteps))
 
 	ms := &FakeMover{"Seconds", 0}
-	sec := NewHand("seconds", time.Minute, ms, time.Millisecond*250, halfStepsRev)
+	sec := NewHand("seconds", time.Minute, ms, time.Millisecond*250, int(*halfSteps))
 
 	hour.Start(face)
 	min.Start(face)

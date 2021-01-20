@@ -56,12 +56,12 @@ var sequence = [][]int{
 }
 
 // NewStepper creates and initialises a Stepper struct
-// halfSteps is the number of half steps per revolution.
-func NewStepper(halfSteps int, pin1, pin2, pin3, pin4 Setter) *Stepper {
+// rev is the number of half steps per revolution.
+func NewStepper(rev float64, pin1, pin2, pin3, pin4 Setter) *Stepper {
 	s := new(Stepper)
 	// Precalculate a timing factor so that a RPM value can be used
 	// to calculate the per-sequence step delay.
-	s.factor = float64(time.Second.Nanoseconds()*60) / float64(halfSteps)
+	s.factor = float64(time.Second.Nanoseconds()*60) / rev
 	s.pin1 = pin1
 	s.pin2 = pin2
 	s.pin3 = pin3

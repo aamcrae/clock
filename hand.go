@@ -30,6 +30,9 @@ type MoveHand interface {
 // will move the hand by one tick each time.
 // Moving is done by sending a +/- step count to a mover.
 // The total number of steps in a single revolution is held in steps.
+// TODO: It's very likely that a single revolution is not an integral
+// number of steps because of gearing, so it would be better to treat
+// steps as a float, and keep a running accumulations of steps.
 type Hand struct {
 	name     string
 	mover    MoveHand
