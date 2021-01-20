@@ -6,6 +6,7 @@
 *.dylib
 example/step
 example/example
+clock
 
 # Test binary, built with `go test -c`
 *.test
