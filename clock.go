@@ -27,17 +27,6 @@ import (
 
 const halfStepsRev = 2048 * 2
 
-type hand struct {
-	name     string
-	stepper  *io.Stepper
-	interval time.Duration
-	ticks    int
-	steps    int // Steps clock revolution
-	divisor  int
-	mod      int
-	current  int
-}
-
 var gpios = []*int{
 	flag.Int("a1", 4, "GPIO pin for motor output 1"),
 	flag.Int("a2", 17, "GPIO pin for motor output 2"),
@@ -47,6 +36,18 @@ var gpios = []*int{
 	flag.Int("b2", 13, "GPIO pin for motor B input 2"),
 	flag.Int("b3", 19, "GPIO pin for motor B input 3"),
 	flag.Int("b4", 26, "GPIO pin for motor B input 4"),
+}
+
+type StepperMover struct {
+	name    string
+	stepper *io.Stepper
+	speed   float64
+	total   int
+}
+
+type FakeMover struct {
+	name  string
+	total int
 }
 
 var startTime = flag.String("time", "3:04:05", "Current time on clock face")
@@ -67,84 +68,29 @@ func main() {
 		}
 		defer pins[i].Close()
 	}
-	hour := new(hand)
-	hour.name = "hours"
-	hour.stepper = io.NewStepper(halfStepsRev, pins[4], pins[5], pins[6], pins[7])
-	hour.interval = time.Minute * 5
-	hour.ticks = 12 * 12
-	hour.divisor = 60 * 5 * 1000
-	hour.steps = halfStepsRev
-	hour.current = hour.target(face)
+	mh := &StepperMover{"hours", io.NewStepper(halfStepsRev, pins[4], pins[5], pins[6], pins[7]), *speed, 0}
+	hour := NewHand("hours", time.Hour*12, mh, time.Minute*5, halfStepsRev)
 
-	min := new(hand)
-	min.name = "minutes"
-	min.stepper = io.NewStepper(halfStepsRev, pins[0], pins[1], pins[2], pins[3])
-	min.interval = time.Second * 10
-	min.ticks = 60 * 6
-	min.divisor = 10 * 1000
-	min.steps = halfStepsRev
-	min.current = min.target(face)
+	mm := &StepperMover{"minutes", io.NewStepper(halfStepsRev, pins[0], pins[1], pins[2], pins[3]), *speed, 0}
+	min := NewHand("minutes", time.Hour, mm, time.Second*10, halfStepsRev)
 
-	sec := new(hand)
-	sec.name = "seconds"
-	sec.interval = time.Second
-	sec.ticks = 60
-	sec.divisor = 1000
-	sec.steps = halfStepsRev
-	sec.current = sec.target(face)
+	ms := &FakeMover{"Seconds", 0}
+	sec := NewHand("seconds", time.Minute, ms, time.Millisecond*250, halfStepsRev)
 
-	go hour.run()
-	go min.run()
-	// go sec.run()
+	hour.Start(face)
+	min.Start(face)
+	sec.Start(face)
 	select {}
 }
 
-func (h *hand) run() {
-	target := h.target(time.Now())
-	fmt.Printf("%s: Setting initial position (%d steps)\n", h.name, target-h.current)
-	h.set(target)
-	// Attempt to start ticker on the interval boundary
-	h.syncTime()
-	ticker := time.NewTicker(h.interval)
-	fmt.Printf("%s: Interval %s, ticker started\n", h.name, h.interval.String())
-	for {
-		h.set(h.target(<-ticker.C))
-	}
+func (m *StepperMover) Move(steps int) {
+	//m.stepper.Step(steps)
+	//m.stepper.Off(steps)		// Turn stepper off between moves
+	m.total += steps
+	fmt.Printf("%s step %d, total %d\n", m.name, steps, m.total)
 }
 
-// Set the hand to the target position
-func (h *hand) set(target int) {
-	var st int
-	if target == 0 {
-		st = h.steps - h.current
-		h.current = 0
-	} else {
-		st = target - h.current
-	}
-	h.current += st
-	if h.stepper != nil {
-		h.stepper.Step(*speed, st)
-		h.stepper.Off()
-	} else {
-		fmt.Printf("%s: step %d\n", h.name, st)
-	}
-}
-
-// Calculate and determine the target tick
-func (h *hand) target(t time.Time) int {
-	// Calculate milliseconds of day.
-	hour, minute, sec := t.Clock()
-	target := (hour % 12) * 60 * 60 * 1000
-	target += minute * 60 * 1000
-	target += sec * 1000
-	target += t.Nanosecond() / 1_000_000
-	return ((target / h.divisor) % h.ticks) * h.steps / h.ticks
-}
-
-// Sync time to the boundary of the interval.
-func (h *hand) syncTime() {
-	n := time.Now()
-	adj := time.Date(n.Year(), n.Month(), n.Day(), n.Hour(), n.Minute(), n.Second(), n.Nanosecond(), time.UTC)
-	tr := adj.Truncate(h.interval).Add(h.interval)
-	time.Sleep(tr.Sub(adj))
+func (m *FakeMover) Move(steps int) {
+	m.total += steps
+	fmt.Printf("%s: step %d, total %d\n", m.name, steps, m.total)
 }
