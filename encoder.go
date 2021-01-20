@@ -35,12 +35,12 @@ type Adjuster interface {
 type Encoder struct {
 	get    GetStep
 	adjust Adjuster
-	slots	int
+	slots  int
 	gpio   *io.Gpio
 }
 
 // NewEncoder creates a new Encoder structure
-func NewEncoder(input *io.Gpio, stepper GetStep, adj Adjuster, slots int) (* Encoder){
+func NewEncoder(input *io.Gpio, stepper GetStep, adj Adjuster, slots int) *Encoder {
 	e := new(Encoder)
 	e.gpio = input
 	e.get = stepper
@@ -50,7 +50,7 @@ func NewEncoder(input *io.Gpio, stepper GetStep, adj Adjuster, slots int) (* Enc
 	return e
 }
 
-func (e * Encoder) driver() {
+func (e *Encoder) driver() {
 	// Poll input
 	// track number of steps per rotation
 	// Get count from stepper
