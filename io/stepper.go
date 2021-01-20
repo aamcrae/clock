@@ -90,7 +90,7 @@ func (s *Stepper) State() int {
 }
 
 // GetStep returns the current step number
-func (s *Stepper) GetStep() int64 {
+func (s *Stepper) Get() int64 {
 	return atomic.LoadInt64(&s.current)
 }
 

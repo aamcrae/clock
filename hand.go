@@ -68,8 +68,8 @@ func (h *Hand) Start(t time.Time) {
 // is derived from a sensor tracking the actual movememnt of the hand.
 // A positive adjust will increase the number of steps on the next movement, which
 // a negative value will reduce the number of steps.
-func (h *Hand) Adjust(adj int32) {
-	atomic.AddInt32(&h.adjust, adj)
+func (h *Hand) Adjust(adj int) {
+	atomic.AddInt32(&h.adjust, int32(adj))
 }
 
 func (h *Hand) run() {
