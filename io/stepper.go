@@ -40,9 +40,9 @@ type Stepper struct {
 	factor                 float64
 	mChan                  chan msg
 	stopChan               chan bool
-	index                  int  // Index to step sequence
-	on                     bool // true if motor drivers on
-	current				   int64 // Current step number
+	index                  int   // Index to step sequence
+	on                     bool  // true if motor drivers on
+	current                int64 // Current step number
 }
 
 // Half step sequence of outputs.

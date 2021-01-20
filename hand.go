@@ -38,10 +38,10 @@ type Hand struct {
 	name     string
 	mover    MoveHand
 	interval time.Duration
-	ticks    int // Number of segments in clock face
-	steps    int // Steps per clock revolution
-	divisor  int // Used to calculate ticks
-	current  int // Current hand position
+	ticks    int   // Number of segments in clock face
+	steps    int   // Steps per clock revolution
+	divisor  int   // Used to calculate ticks
+	current  int   // Current hand position
 	adjust   int32 // Adjustment to apply.
 }
 

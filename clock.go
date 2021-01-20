@@ -50,7 +50,7 @@ type FakeMover struct {
 
 var startTime = flag.String("time", "3:04:05", "Current time on clock face")
 var speed = flag.Float64("speed", 4.0, "Stepper speed in RPM")
-var halfSteps = flag.Float64("steps", 2048 * 2, "Half steps in a revolution")
+var halfSteps = flag.Float64("steps", 2048*2, "Half steps in a revolution")
 
 func main() {
 	flag.Parse()
