@@ -19,6 +19,10 @@ import (
 	"time"
 )
 
+type Setter interface {
+	Set(int) error
+}
+
 type msg struct {
 	speed float64 // RPM
 	steps int
@@ -27,7 +31,7 @@ type msg struct {
 
 // Stepper represents one stepper motor
 type Stepper struct {
-	g1, g2, g3, g4 *Gpio
+	pin1, pin2, pin3, pin4 Setter
 	factor         float64
 	mChan          chan msg
 	stopChan       chan bool
@@ -47,32 +51,17 @@ var sequence = [][]int{
 }
 
 // NewStepper creates and initialises a Stepper
-func NewStepper(steps, g1, g2, g3, g4 int) (*Stepper, error) {
-	if steps <= 30 {
+// halfSteps is the number of half steps per revolution.
+func NewStepper(halfSteps int, pin1, pin2, pin3, pin4 Setter) (*Stepper, error) {
+	if halfSteps <= 30 {
 		return nil, fmt.Errorf("invalid steps per revolution")
 	}
 	s := new(Stepper)
-	s.factor = float64(time.Second.Nanoseconds()*60) / float64(steps*2)
-	var err error
-	s.g1, err = OutputPin(g1)
-	if err != nil {
-		return nil, err
-	}
-	s.g2, err = OutputPin(g2)
-	if err != nil {
-		s.Close()
-		return nil, err
-	}
-	s.g3, err = OutputPin(g3)
-	if err != nil {
-		s.Close()
-		return nil, err
-	}
-	s.g4, err = OutputPin(g4)
-	if err != nil {
-		s.Close()
-		return nil, err
-	}
+	s.factor = float64(time.Second.Nanoseconds()*60) / float64(halfSteps)
+	s.pin1 = pin1
+	s.pin2 = pin2
+	s.pin3 = pin3
+	s.pin4 = pin4
 	s.mChan = make(chan msg, 20)
 	s.stopChan = make(chan bool)
 	go s.handler()
@@ -81,24 +70,32 @@ func NewStepper(steps, g1, g2, g3, g4 int) (*Stepper, error) {
 
 // Close disables the outputs and frees resources
 func (s *Stepper) Close() {
-	if s.g1 != nil {
-		s.g1.Close()
-	}
-	if s.g2 != nil {
-		s.g2.Close()
-	}
-	if s.g3 != nil {
-		s.g3.Close()
-	}
-	if s.g4 != nil {
-		s.g4.Close()
-	}
 	if s.mChan != nil {
-		s.stopChan <- true
+		s.Stop()
+		close(s.mChan)
+		close(s.stopChan)
 	}
 }
 
-// Step runs the stepper motor for number of steps at the RPM selected.
+// Save returns the current sequence index.
+func (s *Stepper) Save() int {
+	return s.index
+}
+
+// Restore initialises the sequence index to this value and
+// initialises the outputs
+func (s *Stepper) Restore(i int) {
+	s.index = i & 7
+	s.output()
+}
+
+// Stop aborts any current stepping.
+func (s *Stepper) Stop() {
+	s.stopChan <- true
+	s.Wait()
+}
+
+// Step runs the stepper motor for number of half steps at the RPM selected.
 // If steps is positive, then the motor is run clockwise, otherwise ccw.
 func (s *Stepper) Step(rpm float64, steps int) {
 	if steps != 0 && rpm > 0.0 {
@@ -121,7 +118,6 @@ func (s *Stepper) handler() {
 		case m := <-s.mChan:
 			if m.steps != 0 {
 				if s.step(m.speed, m.steps) {
-					s.die()
 					return
 				}
 			}
@@ -129,9 +125,11 @@ func (s *Stepper) handler() {
 				m.sync <- true
 				close(m.sync)
 			}
-		case <-s.stopChan:
-			s.die()
-			return
+		case stop := <-s.stopChan:
+			s.flush()
+			if !stop {
+				return
+			}
 		}
 	}
 }
@@ -142,28 +140,51 @@ func (s *Stepper) step(rpm float64, steps int) bool {
 		inc = -1
 		steps = -steps
 	}
-	steps = steps * 2
 	delay := time.Duration(s.factor / rpm)
 	ticker := time.NewTicker(delay)
 	defer ticker.Stop()
 	for i := 0; i < steps; i++ {
-		seq := sequence[s.index]
 		s.index = (s.index + inc) & 7
-		s.g1.Set(seq[0])
-		s.g2.Set(seq[1])
-		s.g3.Set(seq[2])
-		s.g4.Set(seq[3])
+		s.output()
 		select {
-		case <-s.stopChan:
-			return true
+		case stop := <-s.stopChan:
+			s.flush()
+			if stop {
+				// Abort current stepping loop
+				return false
+			} else {
+				// channel is closed, so kill handler.
+				return true
+			}
 		case <-ticker.C:
 		}
 	}
 	return false
 }
 
-// Handler is stopping.
-func (s *Stepper) die() {
-	close(s.mChan)
-	close(s.stopChan)
+// Flush all remaining actions from message channel.
+func (s *Stepper) flush() {
+	for {
+		select {
+		case m := <-s.mChan:
+			if m.sync != nil {
+				m.sync <- true
+				close(m.sync)
+			} else if m.steps == 0 && m.speed == 0.0 {
+				// Channel has been closed.
+				return
+			}
+		default:
+			return
+		}
+	}
+}
+
+// Set the GPIO outputs
+func (s *Stepper) output() {
+	seq := sequence[s.index]
+	s.pin1.Set(seq[0])
+	s.pin2.Set(seq[1])
+	s.pin3.Set(seq[2])
+	s.pin4.Set(seq[3])
 }
