@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+const stepperQueueSize = 20 // Size of queue for requests
+
 // Setter is an interface for setting an output value on a GPIO
 type Setter interface {
 	Set(int) error
@@ -29,16 +31,18 @@ type msg struct {
 	sync  chan bool
 }
 
-// Stepper represents one stepper motor
+// Stepper represents a stepper motor.
+// All actual stepping is done in a background goroutine, so requests can be queued.
+// All step values assume half-steps.
 type Stepper struct {
 	pin1, pin2, pin3, pin4 Setter
 	factor                 float64
 	mChan                  chan msg
 	stopChan               chan bool
-	index                  int
+	index                  int // Index to step sequence
 }
 
-// Half step sequence
+// Half step sequence of outputs.
 var sequence = [][]int{
 	[]int{1, 0, 0, 0},
 	[]int{1, 1, 0, 0},
@@ -54,73 +58,82 @@ var sequence = [][]int{
 // halfSteps is the number of half steps per revolution.
 func NewStepper(halfSteps int, pin1, pin2, pin3, pin4 Setter) *Stepper {
 	s := new(Stepper)
+	// Precalculate a timing factor so that a RPM value can be used
+	// to calculate the per-sequence step delay.
 	s.factor = float64(time.Second.Nanoseconds()*60) / float64(halfSteps)
 	s.pin1 = pin1
 	s.pin2 = pin2
 	s.pin3 = pin3
 	s.pin4 = pin4
-	s.mChan = make(chan msg, 20)
+	s.mChan = make(chan msg, stepperQueueSize)
 	s.stopChan = make(chan bool)
 	go s.handler()
 	return s
 }
 
-// Close disables the outputs and frees resources
+// Close stops the motor and frees any resources
 func (s *Stepper) Close() {
 	s.Stop()
 	close(s.mChan)
 	close(s.stopChan)
 }
 
-// Save returns the current sequence index.
-func (s *Stepper) Save() int {
+// State returns the current sequence index, so that the current state
+// of the motor can be saved and then restored in a new instance.
+// This allows the exact state of the motor to be restored
+// across process restarts so that the maximum accuracy can be guaranteed.
+func (s *Stepper) State() int {
 	return s.index
 }
 
-// Restore initialises the sequence index to this value and
-// initialises the outputs
+// Restore initialises the sequence index to this value and sets the outputs
 func (s *Stepper) Restore(i int) {
 	s.index = i & 7
 	s.output()
 }
 
-// Stop aborts any current stepping.
+// Stop aborts any current stepping, and flushes all queued requests.
 func (s *Stepper) Stop() {
 	s.stopChan <- true
 	s.Wait()
 }
 
-// Step runs the stepper motor for number of half steps at the RPM selected.
+// Step queues a request to step the motor at the RPM selected for the
+// number of half-steps.
 // If steps is positive, then the motor is run clockwise, otherwise ccw.
-func (s *Stepper) Step(rpm float64, steps int) {
-	if steps != 0 && rpm > 0.0 {
-		s.mChan <- msg{speed: rpm, steps: steps}
+// A number of requests can be queued.
+func (s *Stepper) Step(rpm float64, halfSteps int) {
+	if halfSteps != 0 && rpm > 0.0 {
+		s.mChan <- msg{speed: rpm, steps: halfSteps}
 	}
 }
 
-// Wait waits for all commands to complete
+// Wait waits for all requests to complete
 func (s *Stepper) Wait() {
 	c := make(chan bool)
 	s.mChan <- msg{speed: 0, steps: 0, sync: c}
 	<-c
 }
 
-// Background handler.
-// Listens on message channel, and controls the motor.
+// goroutine handler
+// Listens on message channel, and runs the motor.
 func (s *Stepper) handler() {
 	for {
 		select {
 		case m := <-s.mChan:
+			// Request to step the motor
 			if m.steps != 0 {
 				if s.step(m.speed, m.steps) {
 					return
 				}
 			}
 			if m.sync != nil {
+				// If sync channel is present, signal it.
 				m.sync <- true
 				close(m.sync)
 			}
 		case stop := <-s.stopChan:
+			// Request to stop and flush all requests
 			s.flush()
 			if !stop {
 				return
@@ -129,12 +142,17 @@ func (s *Stepper) handler() {
 	}
 }
 
+// step runs the motor.
+// A stop channel can be used to abort the sequence.
 func (s *Stepper) step(rpm float64, steps int) bool {
 	inc := 1
 	if steps < 0 {
+		// Counter-clockwise
 		inc = -1
 		steps = -steps
 	}
+	// Calculate the per-step delay in nanoseconds by using the timing factor
+	// and requested RPM, and use a ticker to signal the step sequence.
 	delay := time.Duration(s.factor / rpm)
 	ticker := time.NewTicker(delay)
 	defer ticker.Stop()
@@ -166,7 +184,7 @@ func (s *Stepper) flush() {
 				m.sync <- true
 				close(m.sync)
 			} else if m.steps == 0 && m.speed == 0.0 {
-				// Channel has been closed.
+				// nil msg, channel has been closed.
 				return
 			}
 		default:
