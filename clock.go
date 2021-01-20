@@ -69,6 +69,7 @@ func main() {
 	}
 	hour := new(hand)
 	hour.name = "hours"
+	hour.stepper = io.NewStepper(halfStepsRev, pins[4], pins[5], pins[6], pins[7])
 	hour.interval = time.Minute * 5
 	hour.ticks = 12 * 12
 	hour.divisor = 60 * 5 * 1000
@@ -77,7 +78,7 @@ func main() {
 
 	min := new(hand)
 	min.name = "minutes"
-	min.stepper = io.NewStepper(halfStepsRev, pins[4], pins[5], pins[6], pins[7])
+	min.stepper = io.NewStepper(halfStepsRev, pins[0], pins[1], pins[2], pins[3])
 	min.interval = time.Second * 10
 	min.ticks = 60 * 6
 	min.divisor = 10 * 1000
@@ -86,7 +87,6 @@ func main() {
 
 	sec := new(hand)
 	sec.name = "seconds"
-	sec.stepper = io.NewStepper(halfStepsRev, pins[0], pins[1], pins[2], pins[3])
 	sec.interval = time.Second
 	sec.ticks = 60
 	sec.divisor = 1000
@@ -95,7 +95,7 @@ func main() {
 
 	go hour.run()
 	go min.run()
-	go sec.run()
+	// go sec.run()
 	select {}
 }
 
