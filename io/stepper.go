@@ -32,10 +32,10 @@ type msg struct {
 // Stepper represents one stepper motor
 type Stepper struct {
 	pin1, pin2, pin3, pin4 Setter
-	factor         float64
-	mChan          chan msg
-	stopChan       chan bool
-	index          int
+	factor                 float64
+	mChan                  chan msg
+	stopChan               chan bool
+	index                  int
 }
 
 // Half step sequence
