@@ -40,6 +40,7 @@ type Stepper struct {
 	mChan                  chan msg
 	stopChan               chan bool
 	index                  int // Index to step sequence
+	on                     bool // true if motor drivers on
 }
 
 // Half step sequence of outputs.
@@ -89,7 +90,18 @@ func (s *Stepper) State() int {
 // Restore initialises the sequence index to this value and sets the outputs
 func (s *Stepper) Restore(i int) {
 	s.index = i & 7
-	s.output()
+}
+
+// Off turns off the GPIOs to save power
+func (s *Stepper) Off() {
+	if s.on {
+		s.Wait()
+		s.pin1.Set(0)
+		s.pin2.Set(0)
+		s.pin3.Set(0)
+		s.pin4.Set(0)
+		s.on = false
+	}
 }
 
 // Stop aborts any current stepping, and flushes all queued requests.
@@ -104,6 +116,10 @@ func (s *Stepper) Stop() {
 // A number of requests can be queued.
 func (s *Stepper) Step(rpm float64, halfSteps int) {
 	if halfSteps != 0 && rpm > 0.0 {
+		if !s.on {
+			s.output()
+			s.on = true
+		}
 		s.mChan <- msg{speed: rpm, steps: halfSteps}
 	}
 }
