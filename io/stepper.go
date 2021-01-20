@@ -15,6 +15,7 @@
 package io
 
 import (
+	"sync/atomic"
 	"time"
 )
 
@@ -41,6 +42,7 @@ type Stepper struct {
 	stopChan               chan bool
 	index                  int  // Index to step sequence
 	on                     bool // true if motor drivers on
+	current				   int64 // Current step number
 }
 
 // Half step sequence of outputs.
@@ -85,6 +87,11 @@ func (s *Stepper) Close() {
 // across process restarts so that the maximum accuracy can be guaranteed.
 func (s *Stepper) State() int {
 	return s.index
+}
+
+// GetStep returns the current step number
+func (s *Stepper) GetStep() int64 {
+	return atomic.LoadInt64(&s.current)
 }
 
 // Restore initialises the sequence index to this value and sets the outputs
@@ -175,6 +182,7 @@ func (s *Stepper) step(rpm float64, steps int) bool {
 	for i := 0; i < steps; i++ {
 		s.index = (s.index + inc) & 7
 		s.output()
+		atomic.AddInt64(&s.current, int64(inc))
 		select {
 		case stop := <-s.stopChan:
 			s.flush()

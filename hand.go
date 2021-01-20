@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -41,6 +42,7 @@ type Hand struct {
 	steps    int // Steps per clock revolution
 	divisor  int // Used to calculate ticks
 	current  int // Current hand position
+	adjust   int32 // Adjustment to apply.
 }
 
 // NewHand creates and initialises a Hand structure.
@@ -61,6 +63,15 @@ func (h *Hand) Start(t time.Time) {
 	go h.run()
 }
 
+// Adjust records an adjustment in half-steps that should be applied
+// to the step counter on the next movement. An adjustment usually
+// is derived from a sensor tracking the actual movememnt of the hand.
+// A positive adjust will increase the number of steps on the next movement, which
+// a negative value will reduce the number of steps.
+func (h *Hand) Adjust(adj int32) {
+	atomic.AddInt32(&h.adjust, adj)
+}
+
 func (h *Hand) run() {
 	target := h.target(time.Now())
 	fmt.Printf("%s: Setting initial position (%d steps)\n", h.name, target-h.current)
@@ -76,12 +87,13 @@ func (h *Hand) run() {
 
 // Set the hand to the target position
 func (h *Hand) set(target int) {
-	var st int
+	// Get the adjustment value
+	st := int(atomic.SwapInt32(&h.adjust, 0))
 	if target == 0 {
-		st = h.steps - h.current
+		st += h.steps - h.current
 		h.current = 0
 	} else {
-		st = target - h.current
+		st += target - h.current
 		h.current += st
 	}
 	h.mover.Move(st)
