@@ -87,7 +87,7 @@ func (h *Hand) run() {
 
 // Set the hand to the target position
 func (h *Hand) set(target int) {
-	// Get the adjustment value
+	// Get the adjustment value, if any.
 	st := int(atomic.SwapInt32(&h.adjust, 0))
 	if target == 0 {
 		st += h.steps - h.current

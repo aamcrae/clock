@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
@@ -26,26 +25,23 @@ import (
 )
 
 var gpios = []*int{
-	flag.Int("a1", 4, "GPIO pin for motor output 1"),
-	flag.Int("a2", 17, "GPIO pin for motor output 2"),
-	flag.Int("a3", 27, "GPIO pin for motor output 3"),
-	flag.Int("a4", 22, "GPIO pin for motor output 4"),
-	flag.Int("b1", 6, "GPIO pin for motor B input 1"),
-	flag.Int("b2", 13, "GPIO pin for motor B input 2"),
-	flag.Int("b3", 19, "GPIO pin for motor B input 3"),
-	flag.Int("b4", 26, "GPIO pin for motor B input 4"),
+	flag.Int("m1", 4, "Minutes output 1"),
+	flag.Int("m2", 17, "Minutes output 2"),
+	flag.Int("m3", 27, "Minutes output 3"),
+	flag.Int("m4", 22, "Minutes output 4"),
+	flag.Int("h1", 6, "Hours output 1"),
+	flag.Int("h2", 13, "Hours output 2"),
+	flag.Int("h3", 19, "Hours output 3"),
+	flag.Int("h4", 26, "Hours output 4"),
 }
+var encHours = flag.Int("hours_enc", 0, "Input for hours encoder")
+var encMinutes = flag.Int("min_enc", 0, "Input for minutes encoder")
+var encSeconds = flag.Int("sec_enc", 0, "Input for seconds encoder")
 
 type StepperMover struct {
 	name    string
 	stepper *io.Stepper
 	speed   float64
-	total   int
-}
-
-type FakeMover struct {
-	name  string
-	total int
 }
 
 var startTime = flag.String("time", "3:04:05", "Current time on clock face")
@@ -54,7 +50,7 @@ var halfSteps = flag.Float64("steps", 2048*2, "Half steps in a revolution")
 
 func main() {
 	flag.Parse()
-	face, err := time.Parse("3:04:05", *startTime)
+	initial, err := time.Parse("3:04:05", *startTime)
 	if err != nil {
 		log.Fatalf("%s: %v", *startTime, err)
 	}
@@ -67,29 +63,47 @@ func main() {
 		}
 		defer pins[i].Close()
 	}
-	mh := &StepperMover{"hours", io.NewStepper(*halfSteps, pins[4], pins[5], pins[6], pins[7]), *speed, 0}
-	hour := NewHand("hours", time.Hour*12, mh, time.Minute*5, int(*halfSteps))
+	setupHand("hours",
+		io.NewStepper(*halfSteps, pins[4], pins[5], pins[6], pins[7]),
+		time.Hour*12,
+		time.Minute*5,
+		*encHours,
+		initial)
 
-	mm := &StepperMover{"minutes", io.NewStepper(*halfSteps, pins[0], pins[1], pins[2], pins[3]), *speed, 0}
-	min := NewHand("minutes", time.Hour, mm, time.Second*10, int(*halfSteps))
+	setupHand("minutes",
+		io.NewStepper(*halfSteps, pins[0], pins[1], pins[2], pins[3]),
+		time.Hour,
+		time.Second*10,
+		*encMinutes,
+		initial)
 
-	ms := &FakeMover{"Seconds", 0}
-	sec := NewHand("seconds", time.Minute, ms, time.Millisecond*250, int(*halfSteps))
+	setupHand("seconds",
+		nil,
+		time.Minute,
+		time.Millisecond*250,
+		*encSeconds,
+		initial)
 
-	hour.Start(face)
-	min.Start(face)
-	sec.Start(face)
 	select {}
 }
 
-func (m *StepperMover) Move(steps int) {
-	//m.stepper.Step(steps)
-	//m.stepper.Off(steps)		// Turn stepper off between moves
-	m.total += steps
-	fmt.Printf("%s step %d, total %d\n", m.name, steps, m.total)
+func setupHand(name string, stepper *io.Stepper, period, update time.Duration, enc int, initial time.Time) {
+	mover := &StepperMover{name, stepper, *speed}
+	h := NewHand(name, period, mover, update, int(*halfSteps))
+	h.Start(initial)
+	if enc != 0 {
+		inp, err := io.Pin(enc)
+		if err != nil {
+			log.Fatalf("Encoder %d: %v", enc, err)
+		}
+		NewEncoder(inp, stepper, h, int(*halfSteps), 1)
+	}
 }
 
-func (m *FakeMover) Move(steps int) {
-	m.total += steps
-	fmt.Printf("%s: step %d, total %d\n", m.name, steps, m.total)
+// Shim for move requests.
+func (m *StepperMover) Move(steps int) {
+	if m.stepper != nil {
+		m.stepper.Step(m.speed, steps)
+		m.stepper.Off() // Turn stepper off between moves
+	}
 }
