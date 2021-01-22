@@ -28,25 +28,29 @@ type Adjuster interface {
 	Adjust(int)
 }
 
+type IO interface {
+	Wait() int
+}
+
 // Encoder is an interrupter encoder used to measure shaft rotations.
 // The count of current step values is used to track the
 // number of steps in a rotation between encoder signals, and
 // this is used against the reference value to determine whether
 // an adjustment should be made.
 type Encoder struct {
-	get       GetStep
+	getStep   GetStep
 	adjust    Adjuster
+	enc		  IO		// I/O from encoder hardware
 	reference int // Reference number of steps per revolution
 	slots     int
-	gpio      *io.Gpio // Input for encoder
 }
 
 // NewEncoder creates a new Encoder structure
-func NewEncoder(input *io.Gpio, stepper GetStep, adj Adjuster, reference, slots int) *Encoder {
+func NewEncoder(stepper GetStep, adj Adjuster, io IO, reference, slots int) *Encoder {
 	e := new(Encoder)
-	e.gpio = input
-	e.get = stepper
+	e.getStep = stepper
 	e.adjust = adj
+	e.enc = IO
 	e.slots = slots
 	e.reference = reference
 	go e.driver()

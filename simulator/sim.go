@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Clock program
+// Simulator clock program
 
 package main
 
