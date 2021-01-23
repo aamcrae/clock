@@ -17,17 +17,12 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/aamcrae/clock"
-	"github.com/aamcrae/config"
 )
-
-var startTime = flag.String("time", "3:04:05", "Current time on clock face")
-var configFile = flag.String("config", "", "Configuration file")
 
 type SimHand struct {
 }

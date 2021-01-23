@@ -40,6 +40,7 @@ type Hand struct {
 	interval time.Duration
 	ticks    int   // Number of segments in clock face
 	steps    int   // Steps per clock revolution
+	adjusted int   // Adjusted steps per revolution
 	divisor  int   // Used to calculate ticks
 	current  int   // Current hand position
 	adjust   int32 // Adjustment to apply.
@@ -54,6 +55,7 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.ticks = int(unit / update)
 	h.divisor = int(update.Milliseconds())
 	h.steps = steps
+	h.adjusted = steps
 	fmt.Printf("%s: ticks %d, steps %d, divisor %d\n", h.name, h.ticks, h.steps, h.divisor)
 	return h
 }
@@ -66,10 +68,10 @@ func (h *Hand) Start(t time.Time) {
 // Adjust records an adjustment in half-steps that should be applied
 // to the step counter on the next movement. An adjustment usually
 // is derived from a sensor tracking the actual movememnt of the hand.
-// A positive adjust will increase the number of steps on the next movement, which
+// A positive adjust will increase the number of steps per revolution, and
 // a negative value will reduce the number of steps.
 func (h *Hand) Adjust(adj int) {
-	atomic.AddInt32(&h.adjust, int32(adj))
+	h.adjusted = h.steps + adj
 }
 
 func (h *Hand) run() {
@@ -87,10 +89,9 @@ func (h *Hand) run() {
 
 // Set the hand to the target position
 func (h *Hand) set(target int) {
-	// Get the adjustment value, if any.
-	st := int(atomic.SwapInt32(&h.adjust, 0))
+	st = 0
 	if target == 0 {
-		st += h.steps - h.current
+		st += h.adjusted - h.current
 		h.current = 0
 	} else {
 		st += target - h.current
@@ -109,7 +110,7 @@ func (h *Hand) target(t time.Time) int {
 	target += t.Nanosecond() / 1_000_000
 	mod := (target / h.divisor)
 	mt := mod % h.ticks
-	st := mt * h.steps / h.ticks
+	st := mt * h.adjusted / h.ticks
 	return st
 }
 
