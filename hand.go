@@ -60,8 +60,10 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	return h
 }
 
-func (h *Hand) Start(t time.Time) {
-	h.current = h.target(t)
+func (h *Hand) Start(initial int) {
+	// Calibrate by running at least 2 revolutions.
+	Mov
+	h.current = initial
 	go h.run()
 }
 
