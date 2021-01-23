@@ -34,11 +34,11 @@ type StepperMover struct {
 
 type HandConfig struct {
 	Name    string
-	Gpio	[]int
-	Speed	float64
-	Period	time.Duration
-	Update	time.Duration
-	Steps	float64
+	Gpio    []int
+	Speed   float64
+	Period  time.Duration
+	Update  time.Duration
+	Steps   float64
 	Encoder int
 }
 
@@ -76,7 +76,7 @@ func main() {
 //  period=12h
 //  update=5m
 //  steps=4096
-func handConfig(conf *config.Section) (* HandConfig, error) {
+func handConfig(conf *config.Section) (*HandConfig, error) {
 	var err error
 	var h HandConfig
 	h.Name = conf.Name
@@ -122,7 +122,7 @@ func handConfig(conf *config.Section) (* HandConfig, error) {
 }
 
 func setupHand(hc *HandConfig, initial time.Time) error {
-	var gp[4] *io.Gpio
+	var gp [4]*io.Gpio
 	var err error
 	for i, v := range hc.Gpio {
 		gp[i], err = io.OutputPin(v)
@@ -137,7 +137,7 @@ func setupHand(hc *HandConfig, initial time.Time) error {
 	if err != nil {
 		fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	NewEncoder(inp, stepper, h, int(hc.Steps), 1)
+	NewEncoder(stepper, h, inp, int(hc.Steps), 100)
 	h.Start(initial)
 	return nil
 }

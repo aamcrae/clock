@@ -17,20 +17,23 @@
 package main
 
 import (
-	"github.com/aamcrae/clock/io"
+	"log"
 )
 
 type GetStep interface {
-	Get() int64
+	GetStep() int64
 }
 
 type Adjuster interface {
 	Adjust(int)
 }
 
+// Edge triggered input
 type IO interface {
-	Wait() int
+	Get() (int, error)
 }
+
+const debounce = 20
 
 // Encoder is an interrupter encoder used to measure shaft rotations.
 // The count of current step values is used to track the
@@ -40,26 +43,82 @@ type IO interface {
 type Encoder struct {
 	getStep   GetStep
 	adjust    Adjuster
-	enc		  IO		// I/O from encoder hardware
-	reference int // Reference number of steps per revolution
-	slots     int
+	enc       IO    // I/O from encoder hardware
+	Invert    bool  // Invert input signal
+	reference int   // Reference number of steps per revolution
+	Measured  int   // Measured steps per revolution
+	size      int64 // Minimum size of sensor gap
 }
 
 // NewEncoder creates a new Encoder structure
-func NewEncoder(stepper GetStep, adj Adjuster, io IO, reference, slots int) *Encoder {
+func NewEncoder(stepper GetStep, adj Adjuster, io IO, reference, size int) *Encoder {
 	e := new(Encoder)
 	e.getStep = stepper
 	e.adjust = adj
-	e.enc = IO
-	e.slots = slots
+	e.enc = io
 	e.reference = reference
+	e.size = int64(size)
+	e.Measured = -1
 	go e.driver()
 	return e
 }
 
+// Poll input
+// track number of steps per rotation
+// Get count from stepper
+// figure out adjustment
 func (e *Encoder) driver() {
-	// Poll input
-	// track number of steps per rotation
-	// Get count from stepper
-	// figure out adjustment
+	last := int64(-1)
+	lastMid := int64(-1)
+	lastKnown := false
+	midpoint := int64(-1)
+	start := int64(-1)
+	for {
+		// Sensor going high or low
+		s, err := e.enc.Get()
+		if err != nil {
+			log.Fatalf("Encoder input: %v", err)
+		}
+		if e.Invert {
+			s = s ^ 1
+		}
+		loc := e.getStep.GetStep()
+		if last == -1 {
+			last = loc
+			continue
+		}
+		// Check for debounce
+		d := diff(loc, last)
+		last = loc
+		if d < debounce {
+			continue
+		}
+		if s == 1 {
+			start = loc
+		} else if d >= e.size {
+			midpoint = (loc-start)/2 + start
+			if lastKnown {
+				// If the last sensor midpoint is known,
+				// calculate the difference between the current
+				// midpoint and the previous.
+				// This is the measured number of steps in a revolution.
+				e.Measured = int(diff(lastMid, midpoint))
+				diff := e.Measured - e.reference
+				if diff != 0 {
+					e.adjust.Adjust(diff)
+				}
+			}
+			lastMid = midpoint
+			lastKnown = true
+		}
+	}
+}
+
+// Get absolute difference between 2 locations
+func diff(a, b int64) int64 {
+	d := a - b
+	if d < 0 {
+		d = -d
+	}
+	return d
 }

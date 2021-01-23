@@ -89,8 +89,9 @@ func (s *Stepper) State() int {
 	return s.index
 }
 
-// GetStep returns the current step number
-func (s *Stepper) Get() int64 {
+// GetStep returns the current step number, which is an accumulative
+// signed value representing the steps moved.
+func (s *Stepper) GetStep() int64 {
 	return atomic.LoadInt64(&s.current)
 }
 
