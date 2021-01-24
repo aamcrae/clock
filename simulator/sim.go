@@ -17,6 +17,7 @@
 package main
 
 import (
+    "flag"
 	"fmt"
 	"math"
 	"time"
@@ -42,6 +43,7 @@ type Sim struct {
 }
 
 func main() {
+    flag.Parse()
 	h := sim("hours", 12*time.Hour, 5*time.Minute, 4096, 1.003884)
 	m := sim("minutes", time.Hour, 10*time.Second, 4096, 1.01234)
 	s := sim("seconds", time.Minute, 250*time.Millisecond, 4096, 0.997654)
@@ -62,13 +64,14 @@ func main() {
 		time.Sleep(time.Second)
 		fmt.Printf("Waiting for calibration\n")
 	}
+    go hand.ClockServer(h.hand, m.hand, s.hand)
 	for {
 		hval := h.Pos(1, 12)
 		fmt.Printf(":")
 		mval := m.Pos(0, 60)
 		fmt.Printf(":")
 		sval := s.Pos(0, 60)
-		now := time.Now()
+		now := time.Now().Round(time.Second)
 		rt := time.Date(now.Year(), now.Month(), now.Day(), now.Hour()%12, now.Minute(), now.Second(), 0, time.Local)
 		myt := time.Date(now.Year(), now.Month(), now.Day(), hval, mval, sval, 0, time.Local)
 		fmt.Printf(" - diff is %s\n", myt.Sub(rt).String())
