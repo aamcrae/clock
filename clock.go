@@ -22,6 +22,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/aamcrae/clock/hand"
 	"github.com/aamcrae/clock/io"
 	"github.com/aamcrae/config"
 )

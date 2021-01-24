@@ -14,7 +14,7 @@
 
 // Interrupter encoder driver
 
-package main
+package hand
 
 import (
 	"log"
@@ -48,6 +48,7 @@ type Encoder struct {
 	reference int   // Reference number of steps per revolution
 	Measured  int   // Measured steps per revolution
 	size      int64 // Minimum size of sensor gap
+	Midpoint  int64 // Midpoint of sensor.
 }
 
 // NewEncoder creates a new Encoder structure
@@ -58,7 +59,7 @@ func NewEncoder(stepper GetStep, adj Adjuster, io IO, reference, size int) *Enco
 	e.enc = io
 	e.reference = reference
 	e.size = int64(size)
-	e.Measured = -1
+	e.Measured = 0
 	go e.driver()
 	return e
 }
@@ -71,7 +72,7 @@ func (e *Encoder) driver() {
 	last := int64(-1)
 	lastMid := int64(-1)
 	lastKnown := false
-	midpoint := int64(-1)
+	e.Midpoint = int64(-1)
 	start := int64(-1)
 	for {
 		// Sensor going high or low
@@ -96,19 +97,19 @@ func (e *Encoder) driver() {
 		if s == 1 {
 			start = loc
 		} else if d >= e.size {
-			midpoint = (loc-start)/2 + start
+			e.Midpoint = (loc-start)/2 + start
 			if lastKnown {
 				// If the last sensor midpoint is known,
 				// calculate the difference between the current
 				// midpoint and the previous.
 				// This is the measured number of steps in a revolution.
-				e.Measured = int(diff(lastMid, midpoint))
+				e.Measured = int(diff(lastMid, e.Midpoint))
 				diff := e.Measured - e.reference
 				if diff != 0 {
 					e.adjust.Adjust(diff)
 				}
 			}
-			lastMid = midpoint
+			lastMid = e.Midpoint
 			lastKnown = true
 		}
 	}

@@ -14,11 +14,10 @@
 
 // Clock hand processing
 
-package main
+package hand
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 )
 
@@ -35,7 +34,7 @@ type MoveHand interface {
 // number of steps because of gearing, so it would be better to treat
 // steps as a float, and keep a running accumulations of steps.
 type Hand struct {
-	name     string
+	Name     string
 	mover    MoveHand
 	interval time.Duration
 	ticks    int   // Number of segments in clock face
@@ -49,22 +48,19 @@ type Hand struct {
 // NewHand creates and initialises a Hand structure.
 func NewHand(name string, unit time.Duration, mover MoveHand, update time.Duration, steps int) *Hand {
 	h := new(Hand)
-	h.name = name
+	h.Name = name
 	h.mover = mover
 	h.interval = update
 	h.ticks = int(unit / update)
 	h.divisor = int(update.Milliseconds())
 	h.steps = steps
 	h.adjusted = steps
-	fmt.Printf("%s: ticks %d, steps %d, divisor %d\n", h.name, h.ticks, h.steps, h.divisor)
+	fmt.Printf("%s: ticks %d, steps %d, divisor %d\n", h.Name, h.ticks, h.steps, h.divisor)
 	return h
 }
 
-func (h *Hand) Start(initial int) {
-	// Calibrate by running at least 2 revolutions.
-	Mov
-	h.current = initial
-	go h.run()
+func (h *Hand) Position() (int, int) {
+	return h.current, h.adjusted
 }
 
 // Adjust records an adjustment in half-steps that should be applied
@@ -76,14 +72,15 @@ func (h *Hand) Adjust(adj int) {
 	h.adjusted = h.steps + adj
 }
 
-func (h *Hand) run() {
+func (h *Hand) Run(initial int) {
+	h.current = initial
 	target := h.target(time.Now())
-	fmt.Printf("%s: Setting initial position (%d steps)\n", h.name, target-h.current)
+	fmt.Printf("%s: Setting initial position (%d steps)\n", h.Name, target-h.current)
 	h.set(target)
 	// Attempt to start ticker on the interval boundary
 	h.syncTime()
 	ticker := time.NewTicker(h.interval)
-	fmt.Printf("%s: Interval %s, ticker started\n", h.name, h.interval.String())
+	fmt.Printf("%s: Interval %s, ticker started\n", h.Name, h.interval.String())
 	for {
 		h.set(h.target(<-ticker.C))
 	}
@@ -91,7 +88,7 @@ func (h *Hand) run() {
 
 // Set the hand to the target position
 func (h *Hand) set(target int) {
-	st = 0
+	st := 0
 	if target == 0 {
 		st += h.adjusted - h.current
 		h.current = 0
