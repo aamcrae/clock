@@ -38,28 +38,25 @@ const debounce = 20
 // Encoder is an interrupter encoder used to measure shaft rotations.
 // The count of current step values is used to track the
 // number of steps in a rotation between encoder signals, and
-// this is used against the reference value to determine whether
+// this is used against the previous value to determine whether
 // an adjustment should be made.
 type Encoder struct {
-	getStep   GetStep
-	adjust    Adjuster
-	enc       IO    // I/O from encoder hardware
-	Invert    bool  // Invert input signal
-	reference int   // Reference number of steps per revolution
-	Measured  int   // Measured steps per revolution
-	size      int64 // Minimum size of sensor gap
-	Midpoint  int64 // Midpoint of sensor.
+	getStep  GetStep
+	adjust   Adjuster
+	enc      IO    // I/O from encoder hardware
+	Invert   bool  // Invert input signal
+	Measured int   // Measured steps per revolution
+	size     int64 // Minimum size of sensor gap
+	Midpoint int   // Midpoint of sensor.
 }
 
 // NewEncoder creates a new Encoder structure
-func NewEncoder(stepper GetStep, adj Adjuster, io IO, reference, size int) *Encoder {
+func NewEncoder(stepper GetStep, adj Adjuster, io IO, size int) *Encoder {
 	e := new(Encoder)
 	e.getStep = stepper
 	e.adjust = adj
 	e.enc = io
-	e.reference = reference
 	e.size = int64(size)
-	e.Measured = 0
 	go e.driver()
 	return e
 }
@@ -70,9 +67,7 @@ func NewEncoder(stepper GetStep, adj Adjuster, io IO, reference, size int) *Enco
 // figure out adjustment
 func (e *Encoder) driver() {
 	last := int64(-1)
-	lastMid := int64(-1)
-	lastKnown := false
-	e.Midpoint = int64(-1)
+	lastMid := -1
 	start := int64(-1)
 	for {
 		// Sensor going high or low
@@ -97,20 +92,18 @@ func (e *Encoder) driver() {
 		if s == 1 {
 			start = loc
 		} else if d >= e.size {
-			e.Midpoint = (loc-start)/2 + start
-			if lastKnown {
+			e.Midpoint = int((loc-start)/2 + start)
+			if lastMid > 0 {
 				// If the last sensor midpoint is known,
 				// calculate the difference between the current
 				// midpoint and the previous.
 				// This is the measured number of steps in a revolution.
-				e.Measured = int(diff(lastMid, e.Midpoint))
-				diff := e.Measured - e.reference
-				if diff != 0 {
-					e.adjust.Adjust(diff)
+				e.Measured = int(diff(int64(lastMid), int64(e.Midpoint)))
+				if lastMid != e.Measured {
+					e.adjust.Adjust(e.Measured)
 				}
 			}
 			lastMid = e.Midpoint
-			lastKnown = true
 		}
 	}
 }

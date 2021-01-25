@@ -29,20 +29,19 @@ type MoveHand interface {
 // is represented by the number of ticks. Updating the clock
 // will move the hand by one tick each time.
 // Moving is done by sending a +/- step count to a mover.
-// The total number of steps in a single revolution is held in steps.
-// TODO: It's very likely that a single revolution is not an integral
-// number of steps because of gearing, so it would be better to treat
-// steps as a float, and keep a running accumulations of steps.
+// The number of steps in a single revolution is held in adjusted,
+// which is initially set from a reference value, and can be
+// updated by an external encoder tracking the actual physical
+// movement of the hand.
 type Hand struct {
 	Name     string
 	mover    MoveHand
 	interval time.Duration
-	ticks    int   // Number of segments in clock face
-	steps    int   // Steps per clock revolution
-	adjusted int   // Adjusted steps per revolution
-	divisor  int   // Used to calculate ticks
-	current  int   // Current hand position
-	adjust   int32 // Adjustment to apply.
+	ticks    int // Number of segments in clock face
+	steps    int // Reference steps per clock revolution
+	adjusted int // Measured steps per revolution
+	divisor  int // Used to calculate ticks
+	current  int // Current hand position
 }
 
 // NewHand creates and initialises a Hand structure.
@@ -59,19 +58,23 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	return h
 }
 
+// Position returns the current hand position as well as the
+// number of steps in a revolution.
 func (h *Hand) Position() (int, int) {
 	return h.current, h.adjusted
 }
 
-// Adjust records an adjustment in half-steps that should be applied
-// to the step counter on the next movement. An adjustment usually
-// is derived from a sensor tracking the actual movememnt of the hand.
-// A positive adjust will increase the number of steps per revolution, and
-// a negative value will reduce the number of steps.
+// Adjust sets an updated steps per revolution.
+// An adjustment usually is derived from a sensor tracking the actual
+// movememnt of the hand.
 func (h *Hand) Adjust(adj int) {
-	h.adjusted = h.steps + adj
+	fmt.Printf("%s: New steps per revol = %d (old %d)\n", h.Name, adj, h.adjusted)
+	h.adjusted = adj
 }
 
+// Run starts the processing of the hand. An initial value
+// indicates the physical location of the hand, as steps around the
+// clock face, and this is used to set the current location of the hand.
 func (h *Hand) Run(initial int) {
 	h.current = initial
 	target := h.target(time.Now())
@@ -109,7 +112,8 @@ func (h *Hand) target(t time.Time) int {
 	target += t.Nanosecond() / 1_000_000
 	mod := (target / h.divisor)
 	mt := mod % h.ticks
-	st := mt * h.adjusted / h.ticks
+	// Round up.
+	st := (mt*h.adjusted + h.ticks/2) / h.ticks
 	return st
 }
 

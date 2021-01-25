@@ -77,6 +77,7 @@ func main() {
 //  period=12h
 //  update=5m
 //  steps=4096
+//  initial=2100
 func handConfig(conf *config.Section) (*HandConfig, error) {
 	var err error
 	var h HandConfig

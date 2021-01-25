@@ -17,15 +17,15 @@
 package main
 
 import (
-    "flag"
+	"flag"
 	"fmt"
+	"io"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/aamcrae/clock/hand"
 )
-
-const refSteps = 4096
 
 type SimHand struct {
 	hand         *hand.Hand
@@ -39,14 +39,26 @@ type SimHand struct {
 	actual       float64
 }
 
-type Sim struct {
+var params = []struct {
+	name           string
+	period, update time.Duration
+	reference      int
+	perstep        float64
+	edge1          int
+	edge2          int
+}{
+	{"hours", 12 * time.Hour, 5 * time.Minute, 4096, 1.003884, 2000, 2199},
+	{"minutes", time.Hour, 2 * time.Second, 5123, 1.01234, 3000, 3399},
+	{"seconds", time.Minute, 100 * time.Millisecond, 4017, 0.995654, 1500, 1599},
 }
 
+const threshold = time.Millisecond * 50
+
 func main() {
-    flag.Parse()
-	h := sim("hours", 12*time.Hour, 5*time.Minute, 4096, 1.003884)
-	m := sim("minutes", time.Hour, 10*time.Second, 4096, 1.01234)
-	s := sim("seconds", time.Minute, 250*time.Millisecond, 4096, 0.997654)
+	flag.Parse()
+	h := sim(0)
+	m := sim(1)
+	s := sim(2)
 	for {
 		hands := 0
 		if h.encoder.Measured != 0 {
@@ -64,46 +76,45 @@ func main() {
 		time.Sleep(time.Second)
 		fmt.Printf("Waiting for calibration\n")
 	}
-    go hand.ClockServer(h.hand, m.hand, s.hand)
+	go hand.ClockServer(h.hand, m.hand, s.hand)
 	for {
-		hval := h.Pos(1, 12)
-		fmt.Printf(":")
-		mval := m.Pos(0, 60)
-		fmt.Printf(":")
-		sval := s.Pos(0, 60)
-		now := time.Now().Round(time.Second)
+		var b strings.Builder
+		hval := h.Pos(&b, 1, 12)
+		fmt.Fprintf(&b, ":")
+		mval := m.Pos(&b, 0, 60)
+		fmt.Fprintf(&b, ":")
+		sval := s.Pos(&b, 0, 60)
+		now := time.Now()
 		rt := time.Date(now.Year(), now.Month(), now.Day(), now.Hour()%12, now.Minute(), now.Second(), 0, time.Local)
 		myt := time.Date(now.Year(), now.Month(), now.Day(), hval, mval, sval, 0, time.Local)
-		fmt.Printf(" - diff is %s\n", myt.Sub(rt).String())
+		diff := myt.Sub(rt)
+		if diff > threshold || diff < -threshold {
+			fmt.Printf("%s - diff is %s\n", b.String(), diff.String())
+		}
 		time.Sleep(time.Second * 5)
 	}
 }
 
-func (s *SimHand) Pos(offs, units int) int {
+func (s *SimHand) Pos(w io.Writer, offs, units int) int {
 	p, r := s.hand.Position()
 	v := p * units / r
-	fmt.Printf("%02d", v)
+	fmt.Fprintf(w, "%02d", v)
 	return v
 }
 
-func sim(name string, period, update time.Duration, ref int, perstep float64) *SimHand {
+func sim(index int) *SimHand {
+	p := &params[index]
 	sh := new(SimHand)
 	sh.encChan = make(chan int, 10)
-	sh.reference = int64(ref)
-	sh.perstep = perstep
-	sh.actual = float64(ref) * perstep
-	sh.edge1 = 2000
-	sh.edge2 = 2200
-	sh.hand = hand.NewHand(name, period, sh, update, ref)
-	sh.encoder = hand.NewEncoder(sh, sh.hand, sh, ref, 100)
-	go hand.Calibrate(sh.encoder, sh.hand, 2100)
+	sh.reference = int64(p.reference)
+	sh.perstep = p.perstep
+	sh.actual = float64(p.reference) * p.perstep
+	sh.edge1 = p.edge1
+	sh.edge2 = p.edge2
+	sh.hand = hand.NewHand(p.name, p.period, sh, p.update, p.reference)
+	sh.encoder = hand.NewEncoder(sh, sh.hand, sh, p.edge1-p.edge2+1)
+	go hand.Calibrate(sh.encoder, sh.hand, p.reference, (p.edge1+p.edge2+1)/2)
 	return sh
-}
-
-func (s *SimHand) Start() {
-	// Start by calibrating the encoder
-	s.hand.Run(0)
-	fmt.Printf("current = %d, measured = %d\n", int(s.current), s.encoder.Measured)
 }
 
 func (s *SimHand) Move(steps int) {
