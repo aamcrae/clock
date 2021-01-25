@@ -49,12 +49,14 @@ var params = []struct {
 	offset         int
 	units          int
 }{
-	{"hours", 12 * time.Hour, 5 * time.Minute, 4096, 1.003884, 2000, 2199, 1, 12},
+	{"hours", 12 * time.Hour, 1 * time.Minute, 4096, 1.003884, 2000, 2199, 1, 12},
 	{"minutes", time.Hour, 2 * time.Second, 5123, 1.01234, 3000, 3399, 0, 60},
 	{"seconds", time.Minute, 100 * time.Millisecond, 4017, 0.995654, 1500, 1599, 0, 60},
 }
 
 const threshold = time.Millisecond * 50
+
+var port = flag.Int("port", 8080, "Web server port number")
 
 func main() {
 	flag.Parse()
@@ -75,7 +77,11 @@ func main() {
 		time.Sleep(time.Second)
 		fmt.Printf("Waiting for calibration\n")
 	}
-	go hand.ClockServer(hands[0].hand, hands[1].hand, hands[2].hand)
+	var clk []*hand.Hand
+	for _, sh := range hands {
+		clk = append(clk, sh.hand)
+	}
+	go hand.ClockServer(*port, clk)
 	for {
 		var b strings.Builder
 		var val [3]int
@@ -116,6 +122,8 @@ func sim(index int) *SimHand {
 	return sh
 }
 
+// Move acts like a stepper motor, moving the hand
+// one step at a time.
 func (s *SimHand) Move(steps int) {
 	var e1, e2 int
 	var inc float64
@@ -133,6 +141,7 @@ func (s *SimHand) Move(steps int) {
 	for i := 0; i < steps; i++ {
 		s.current += inc
 		loc := int(math.Mod(s.current, s.actual))
+		// Check for stepping hitting an encoder edge.
 		if loc == e1 || loc == e2 {
 			s.encValue ^= 1
 			s.encChan <- s.encValue
@@ -141,11 +150,13 @@ func (s *SimHand) Move(steps int) {
 	}
 }
 
+// GetStep returns the current step location
 func (s *SimHand) GetStep() int64 {
 	return int64(s.current)
 }
 
-// Block waiting for input value
+// Get returns an encoder I/O value when
+// it changes.
 func (s *SimHand) Get() (int, error) {
 	for {
 		v := <-s.encChan
