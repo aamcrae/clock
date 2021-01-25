@@ -41,9 +41,9 @@ type HandConfig struct {
 	Update  time.Duration
 	Steps   float64
 	Encoder int
+	Initial int
 }
 
-var startTime = flag.String("time", "3:04:05", "Current time on clock face")
 var configFile = flag.String("config", "", "Configuration file")
 
 func main() {
@@ -52,10 +52,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("%s: %v", *configFile, err)
 	}
-	initial, err := time.Parse("3:04:05", *startTime)
-	if err != nil {
-		log.Fatalf("%s: %v", *startTime, err)
-	}
 	for _, sect := range []string{"hours", "minutes", "seconds"} {
 		s := conf.GetSection(sect)
 		if s != nil {
@@ -63,7 +59,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("%s: %v", *configFile, err)
 			}
-			err = setupHand(hc, initial)
+			err = setupHand(hc)
 			if err != nil {
 				log.Fatalf("%s: %v", hc.Name)
 			}
@@ -120,10 +116,17 @@ func handConfig(conf *config.Section) (*HandConfig, error) {
 	if n != 1 {
 		return nil, fmt.Errorf("encoder: argument count")
 	}
+	n, err = conf.Parse("initial", "%d", &h.Initial)
+	if err != nil {
+		return nil, fmt.Errorf("initial: %v", err)
+	}
+	if n != 1 {
+		return nil, fmt.Errorf("initial: argument count")
+	}
 	return &h, nil
 }
 
-func setupHand(hc *HandConfig, initial time.Time) error {
+func setupHand(hc *HandConfig) error {
 	var gp [4]*io.Gpio
 	var err error
 	for i, v := range hc.Gpio {
@@ -134,13 +137,13 @@ func setupHand(hc *HandConfig, initial time.Time) error {
 	}
 	stepper := io.NewStepper(hc.Steps, gp[0], gp[1], gp[2], gp[3])
 	mover := &StepperMover{hc.Name, stepper, hc.Speed}
-	h := NewHand(hc.Name, hc.Period, mover, hc.Update, int(hc.Steps))
+	h := hand.NewHand(hc.Name, hc.Period, mover, hc.Update, int(hc.Steps))
 	inp, err := io.Pin(hc.Encoder)
 	if err != nil {
 		fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	NewEncoder(stepper, h, inp, int(hc.Steps), 100)
-	h.Start(initial)
+	hand.NewEncoder(stepper, h, inp, int(hc.Steps))
+	h.Run(hc.Initial)
 	return nil
 }
 
