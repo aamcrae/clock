@@ -46,47 +46,46 @@ var params = []struct {
 	perstep        float64
 	edge1          int
 	edge2          int
+	offset         int
+	units          int
 }{
-	{"hours", 12 * time.Hour, 5 * time.Minute, 4096, 1.003884, 2000, 2199},
-	{"minutes", time.Hour, 2 * time.Second, 5123, 1.01234, 3000, 3399},
-	{"seconds", time.Minute, 100 * time.Millisecond, 4017, 0.995654, 1500, 1599},
+	{"hours", 12 * time.Hour, 5 * time.Minute, 4096, 1.003884, 2000, 2199, 1, 12},
+	{"minutes", time.Hour, 2 * time.Second, 5123, 1.01234, 3000, 3399, 0, 60},
+	{"seconds", time.Minute, 100 * time.Millisecond, 4017, 0.995654, 1500, 1599, 0, 60},
 }
 
 const threshold = time.Millisecond * 50
 
 func main() {
 	flag.Parse()
-	h := sim(0)
-	m := sim(1)
-	s := sim(2)
+	var hands []*SimHand
+	for i := range params {
+		hands = append(hands, sim(i))
+	}
 	for {
-		hands := 0
-		if h.encoder.Measured != 0 {
-			hands++
+		ready := 0
+		for _, s := range hands {
+			if s.encoder.Measured != 0 {
+				ready++
+			}
 		}
-		if m.encoder.Measured != 0 {
-			hands++
-		}
-		if s.encoder.Measured != 0 {
-			hands++
-		}
-		if hands == 3 {
+		if ready == len(hands) {
 			break
 		}
 		time.Sleep(time.Second)
 		fmt.Printf("Waiting for calibration\n")
 	}
-	go hand.ClockServer(h.hand, m.hand, s.hand)
+	go hand.ClockServer(hands[0].hand, hands[1].hand, hands[2].hand)
 	for {
 		var b strings.Builder
-		hval := h.Pos(&b, 1, 12)
-		fmt.Fprintf(&b, ":")
-		mval := m.Pos(&b, 0, 60)
-		fmt.Fprintf(&b, ":")
-		sval := s.Pos(&b, 0, 60)
+		var val [3]int
+		for i, h := range hands {
+			val[i] = h.Pos(&b, params[i].offset, params[i].units)
+			fmt.Fprintf(&b, ":")
+		}
 		now := time.Now()
 		rt := time.Date(now.Year(), now.Month(), now.Day(), now.Hour()%12, now.Minute(), now.Second(), 0, time.Local)
-		myt := time.Date(now.Year(), now.Month(), now.Day(), hval, mval, sval, 0, time.Local)
+		myt := time.Date(now.Year(), now.Month(), now.Day(), val[0], val[1], val[2], 0, time.Local)
 		diff := myt.Sub(rt)
 		if diff > threshold || diff < -threshold {
 			fmt.Printf("%s - diff is %s\n", b.String(), diff.String())
@@ -137,6 +136,7 @@ func (s *SimHand) Move(steps int) {
 		if loc == e1 || loc == e2 {
 			s.encValue ^= 1
 			s.encChan <- s.encValue
+			fmt.Printf("%s: Enc %d, loc %d\n", s.hand.Name, s.encValue, loc)
 		}
 		time.Sleep(time.Millisecond)
 	}

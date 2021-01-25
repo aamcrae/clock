@@ -17,6 +17,7 @@
 package hand
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -33,7 +34,7 @@ type IO interface {
 	Get() (int, error)
 }
 
-const debounce = 20
+const debounce = 0
 
 // Encoder is an interrupter encoder used to measure shaft rotations.
 // The count of current step values is used to track the
@@ -66,8 +67,9 @@ func NewEncoder(stepper GetStep, adj Adjuster, io IO, size int) *Encoder {
 // Get count from stepper
 // figure out adjustment
 func (e *Encoder) driver() {
-	last := int64(-1)
-	lastMid := -1
+	last := int64(0)
+	lastMid := int64(-1)
+	lastMeasured := 0
 	start := int64(-1)
 	for {
 		// Sensor going high or low
@@ -79,14 +81,11 @@ func (e *Encoder) driver() {
 			s = s ^ 1
 		}
 		loc := e.getStep.GetStep()
-		if last == -1 {
-			last = loc
-			continue
-		}
 		// Check for debounce
 		d := diff(loc, last)
 		last = loc
-		if d < debounce {
+		if debounce != 0 && d < debounce {
+			fmt.Printf("Debounce! loc = %d, d = %d\n", loc, d)
 			continue
 		}
 		if s == 1 {
@@ -98,12 +97,13 @@ func (e *Encoder) driver() {
 				// calculate the difference between the current
 				// midpoint and the previous.
 				// This is the measured number of steps in a revolution.
-				e.Measured = int(diff(int64(lastMid), int64(e.Midpoint)))
-				if lastMid != e.Measured {
+				e.Measured = int(diff(lastMid, loc))
+				if lastMeasured != e.Measured {
 					e.adjust.Adjust(e.Measured)
+					lastMeasured = e.Measured
 				}
 			}
-			lastMid = e.Midpoint
+			lastMid = loc
 		}
 	}
 }
