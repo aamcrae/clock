@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Interrupter encoder driver
+// Interrupter encoder driver.
 
 package hand
 
@@ -21,26 +21,28 @@ import (
 	"log"
 )
 
+// GetStep provides a method to read the current location of a hand.
 type GetStep interface {
 	GetStep() int64
 }
 
+// Adjuster provides an interface to update the measured number of steps
+// in a revolution of a hand.
 type Adjuster interface {
 	Adjust(int)
 }
 
-// Edge triggered input
+// IO provides a method to return when an input changes.
 type IO interface {
 	Get() (int, error)
 }
 
 const debounce = 0
 
-// Encoder is an interrupter encoder used to measure shaft rotations.
+// Encoder is an interrupter encoder driver used to measure shaft rotations.
 // The count of current step values is used to track the
 // number of steps in a rotation between encoder signals, and
-// this is used against the previous value to determine whether
-// an adjustment should be made.
+// this is used to calculate the actual number of steps in a revolution.
 type Encoder struct {
 	getStep  GetStep
 	adjust   Adjuster
@@ -62,17 +64,14 @@ func NewEncoder(stepper GetStep, adj Adjuster, io IO, size int) *Encoder {
 	return e
 }
 
-// Poll input
-// track number of steps per rotation
-// Get count from stepper
-// figure out adjustment
+// driver is the main goroutine for servicing the encoder.
 func (e *Encoder) driver() {
 	last := int64(0)
 	lastMid := int64(-1)
 	lastMeasured := 0
 	start := int64(-1)
 	for {
-		// Sensor going high or low
+		// Retrieve the sensor value when it changes.
 		s, err := e.enc.Get()
 		if err != nil {
 			log.Fatalf("Encoder input: %v", err)
@@ -80,6 +79,7 @@ func (e *Encoder) driver() {
 		if e.Invert {
 			s = s ^ 1
 		}
+		// Retrieve the current location.
 		loc := e.getStep.GetStep()
 		// Check for debounce
 		d := diff(loc, last)
@@ -88,9 +88,14 @@ func (e *Encoder) driver() {
 			fmt.Printf("Debounce! loc = %d, d = %d\n", loc, d)
 			continue
 		}
+		// If transitioning from 0 to 1, remember this location as
+		// the starting location of the encoder mark
 		if s == 1 {
 			start = loc
 		} else if d >= e.size {
+			// Transitioned from 1 to 0, and the signal is large
+			// enough to be considered as the real encoder mark.
+			// Determine the midpoint of the encoder mark.
 			e.Midpoint = int((loc-start)/2 + start)
 			if lastMid > 0 {
 				// If the last sensor midpoint is known,
@@ -99,6 +104,8 @@ func (e *Encoder) driver() {
 				// This is the measured number of steps in a revolution.
 				e.Measured = int(diff(lastMid, loc))
 				if lastMeasured != e.Measured {
+					// If the number of steps in a revolution has
+					// changed, update the interested party.
 					e.adjust.Adjust(e.Measured)
 					lastMeasured = e.Measured
 				}

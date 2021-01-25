@@ -136,7 +136,6 @@ func (s *SimHand) Move(steps int) {
 		if loc == e1 || loc == e2 {
 			s.encValue ^= 1
 			s.encChan <- s.encValue
-			fmt.Printf("%s: Enc %d, loc %d\n", s.hand.Name, s.encValue, loc)
 		}
 		time.Sleep(time.Millisecond)
 	}

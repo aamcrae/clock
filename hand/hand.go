@@ -21,6 +21,7 @@ import (
 	"time"
 )
 
+// MoveHand is the interface to move the clock hand.
 type MoveHand interface {
 	Move(int)
 }
@@ -68,28 +69,32 @@ func (h *Hand) Position() (int, int) {
 // An adjustment usually is derived from a sensor tracking the actual
 // movememnt of the hand.
 func (h *Hand) Adjust(adj int) {
-	fmt.Printf("%s: New steps per revol = %d (old %d)\n", h.Name, adj, h.adjusted)
 	h.adjusted = adj
 }
 
 // Run starts the processing of the hand. An initial value
-// indicates the physical location of the hand, as steps around the
-// clock face, and this is used to set the current location of the hand.
+// indicates the physical location of the hand as steps around the
+// clock face, and this is used to set the initial location of the hand.
+// The hand processing basically involves starting a ticker at the update
+// rate specified for the hand, and then moving the hand to match the time
+// the ticker sends.
 func (h *Hand) Run(initial int) {
 	h.current = initial
 	target := h.target(time.Now())
-	fmt.Printf("%s: Setting initial position (%d steps)\n", h.Name, target-h.current)
 	h.set(target)
-	// Attempt to start ticker on the interval boundary
+	// Attempt to start ticker on the update boundary so that the ticker
+	// ticks on the precise time of the update interval
 	h.syncTime()
 	ticker := time.NewTicker(h.interval)
 	fmt.Printf("%s: Interval %s, ticker started\n", h.Name, h.interval.String())
 	for {
+		// Receive the time from the ticker, and set the hand to the
+		// target position matching the time.
 		h.set(h.target(<-ticker.C))
 	}
 }
 
-// Set the hand to the target position
+// Set the hand to the target position.
 func (h *Hand) set(target int) {
 	st := 0
 	if target == 0 {
@@ -102,7 +107,9 @@ func (h *Hand) set(target int) {
 	h.mover.Move(st)
 }
 
-// Calculate and determine the target tick
+// Calculate and determine the target position of the hand
+// given the time and the current parameters of the hand (i.e
+// the number of steps in a revolution of the hand.
 func (h *Hand) target(t time.Time) int {
 	// Calculate milliseconds of day.
 	hour, minute, sec := t.Clock()
@@ -117,7 +124,10 @@ func (h *Hand) target(t time.Time) int {
 	return st
 }
 
-// Sync time to the boundary of the interval.
+// Sync time to the boundary of the update interval so that the
+// ticker is aligned to the update time e.g if the update interval
+// of a hand is 10 seconds, then make sure the ticker is sending a tick
+// at 0, 10, 20 seconds (rather than 1, 11, 21...)
 func (h *Hand) syncTime() {
 	n := time.Now()
 	adj := time.Date(n.Year(), n.Month(), n.Day(), n.Hour(), n.Minute(), n.Second(), n.Nanosecond(), time.UTC)
