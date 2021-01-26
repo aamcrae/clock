@@ -5,6 +5,7 @@
 *.so
 *.dylib
 example/step
+example/step2
 example/example
 simulator/simulator
 clock
