@@ -36,6 +36,7 @@ type MoveHand interface {
 // movement of the hand.
 type Hand struct {
 	Name     string
+    Ticking  bool
 	mover    MoveHand
 	interval time.Duration
 	ticks    int // Number of segments in clock face
@@ -86,7 +87,7 @@ func (h *Hand) Run(initial int) {
 	// ticks on the precise time of the update interval
 	h.syncTime()
 	ticker := time.NewTicker(h.interval)
-	fmt.Printf("%s: Interval %s, ticker started\n", h.Name, h.interval.String())
+    h.Ticking = true
 	for {
 		// Receive the time from the ticker, and set the hand to the
 		// target position matching the time.

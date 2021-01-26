@@ -67,7 +67,7 @@ func main() {
 	for {
 		ready := 0
 		for _, s := range hands {
-			if s.encoder.Measured != 0 {
+			if s.hand.Ticking {
 				ready++
 			}
 		}
@@ -75,8 +75,9 @@ func main() {
 			break
 		}
 		time.Sleep(time.Second)
-		fmt.Printf("Waiting for calibration\n")
+		fmt.Printf("Waiting for initialisation to complete (%d/%d ready)\n", ready, len(hands))
 	}
+    fmt.Printf("Clock initialisation complete\n")
 	var clk []*hand.Hand
 	for _, sh := range hands {
 		clk = append(clk, sh.hand)
