@@ -119,7 +119,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		}
 	}
 	c.stepper = io.NewStepper(hc.Steps, gp[0], gp[1], gp[2], gp[3])
-	h := NewHand(hc.Name, hc.Period, c, hc.Update, int(hc.Steps))
+	c.Hand = NewHand(hc.Name, hc.Period, c, hc.Update, int(hc.Steps))
 	inp, err := io.Pin(hc.Encoder)
 	if err != nil {
 		c.stepper.Close()
@@ -131,7 +131,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		inp.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(c.stepper, h, inp, int(hc.Steps))
+	c.Encoder = NewEncoder(c.stepper, c.Hand, inp, int(hc.Steps))
 	return c, nil
 }
 
