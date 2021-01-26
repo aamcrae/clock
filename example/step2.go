@@ -26,7 +26,7 @@ import (
 
 const halfStepsRev = 2048 * 2
 
-var gpios = []*int{
+var step2_gpios = []*int{
 	flag.Int("a1", 4, "GPIO pin for motor A input 1"),
 	flag.Int("a2", 17, "GPIO pin for motor A input 2"),
 	flag.Int("a3", 27, "GPIO pin for motor A input 3"),
@@ -36,13 +36,14 @@ var gpios = []*int{
 	flag.Int("b3", 19, "GPIO pin for motor B input 3"),
 	flag.Int("b4", 26, "GPIO pin for motor B input 4"),
 }
+
 var rpm = flag.Float64("rpm", 5.0, "RPM")
 var steps = flag.Int("steps", halfStepsRev/12, "Steps")
 
 func main() {
 	flag.Parse()
-	pins := make([]*io.Gpio, len(gpios))
-	for i, gp := range gpios {
+	pins := make([]*io.Gpio, len(step2_gpios))
+	for i, gp := range step2_gpios {
 		var err error
 		pins[i], err = io.OutputPin(*gp)
 		if err != nil {

@@ -37,13 +37,13 @@ type MoveHand interface {
 type Hand struct {
 	Name     string
 	Ticking  bool
+	Current  int // Current hand position
 	mover    MoveHand
 	interval time.Duration
 	ticks    int // Number of segments in clock face
 	steps    int // Reference steps per clock revolution
 	adjusted int // Measured steps per revolution
 	divisor  int // Used to calculate ticks
-	current  int // Current hand position
 }
 
 // NewHand creates and initialises a Hand structure.
@@ -63,7 +63,7 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 // Position returns the current hand position as well as the
 // number of steps in a revolution.
 func (h *Hand) Position() (int, int) {
-	return h.current, h.adjusted
+	return h.Current, h.adjusted
 }
 
 // Adjust sets an updated steps per revolution.
@@ -73,14 +73,11 @@ func (h *Hand) Adjust(adj int) {
 	h.adjusted = adj
 }
 
-// Run starts the processing of the hand. An initial value
-// indicates the physical location of the hand as steps around the
-// clock face, and this is used to set the initial location of the hand.
+// Run starts the processing of the hand.
 // The hand processing basically involves starting a ticker at the update
 // rate specified for the hand, and then moving the hand to match the time
 // the ticker sends.
-func (h *Hand) Run(initial int) {
-	h.current = initial
+func (h *Hand) Run() {
 	target := h.target(time.Now())
 	h.set(target)
 	// Attempt to start ticker on the update boundary so that the ticker
@@ -99,11 +96,11 @@ func (h *Hand) Run(initial int) {
 func (h *Hand) set(target int) {
 	st := 0
 	if target == 0 {
-		st += h.adjusted - h.current
-		h.current = 0
+		st += h.adjusted - h.Current
+		h.Current = 0
 	} else {
-		st += target - h.current
-		h.current += st
+		st += target - h.Current
+		h.Current += st
 	}
 	h.mover.Move(st)
 }

@@ -112,7 +112,7 @@ func sim(index int) *SimHand {
 	p := &params[index]
 	sh := new(SimHand)
 	sh.encChan = make(chan int, 10)
-    sh.encChan <- 0
+	sh.encChan <- 0
 	sh.reference = int64(p.reference)
 	sh.perstep = p.perstep
 	sh.actual = float64(p.reference) * p.perstep
@@ -120,7 +120,7 @@ func sim(index int) *SimHand {
 	sh.edge2 = p.edge2
 	sh.hand = hand.NewHand(p.name, p.period, sh, p.update, p.reference)
 	sh.encoder = hand.NewEncoder(sh, sh.hand, sh, p.edge1-p.edge2+1)
-	go hand.Calibrate(sh.encoder, sh.hand, p.reference, (p.edge1+p.edge2+1)/2)
+	go hand.Calibrate(true, sh.encoder, sh.hand, p.reference, (p.edge1+p.edge2+1)/2)
 	return sh
 }
 

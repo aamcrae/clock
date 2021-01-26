@@ -9,6 +9,8 @@ example/step2
 example/watch
 example/example
 simulator/simulator
+utils/utils
+utils/calibrate
 clock
 
 # Test binary, built with `go test -c`

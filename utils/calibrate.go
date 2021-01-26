@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Clock program
+// Calibration utility
 
 package main
 
@@ -25,7 +25,7 @@ import (
 )
 
 var configFile = flag.String("config", "", "Configuration file")
-var port = flag.Int("port", 8080, "Web server port number")
+var section = flag.String("hand", "", "Hand to calibrate e.g hours, minutes, seconds")
 
 func main() {
 	flag.Parse()
@@ -33,28 +33,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("%s: %v", *configFile, err)
 	}
-	var clock []*hand.ClockHand
-	for _, sect := range []string{"hours", "minutes", "seconds"} {
-		hc, err := hand.Config(conf, sect)
-		if err != nil {
-			log.Printf("Invalid config for %s (%v), skipping", sect, err)
-			continue
-		}
-		c, err := hand.NewClockHand(hc)
-		if err != nil {
-			log.Fatalf("%s: %v", hc.Name, err)
-		}
-		clock = append(clock, c)
+	hc, err := hand.Config(conf, *section)
+	if err != nil {
+		log.Fatalf("%s: %v", *configFile, err)
 	}
-	for _, c := range clock {
-		go c.Run()
+	clk, err := hand.NewClockHand(hc)
+	if err != nil {
+		log.Fatalf("ClockHand: %s %v", *section, err)
 	}
-	if *port != 0 {
-		var hands []*hand.Hand
-		for _, c := range clock {
-			hands = append(hands, c.Hand)
-		}
-		hand.ClockServer(*port, hands)
-	}
-	select {}
+	hand.Calibrate(false, clk.Encoder, clk.Hand, clk.Config.Steps, clk.Config.Initial)
 }
