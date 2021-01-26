@@ -17,8 +17,11 @@
 package main
 
 import (
+	"bufio"
 	"flag"
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/aamcrae/clock/hand"
 	"github.com/aamcrae/config"
@@ -42,4 +45,23 @@ func main() {
 		log.Fatalf("ClockHand: %s %v", *section, err)
 	}
 	hand.Calibrate(false, clk.Encoder, clk.Hand, clk.Config.Steps, clk.Config.Initial)
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("Enter steps or command ('help' for help)")
+		text, _ := reader.ReadString('\n')
+		switch text {
+		case "help":
+			fmt.Println("Enter signed number of steps, or:")
+			fmt.Println("  help - print help")
+			fmt.Println("  m - move to encoder midpoint")
+		case "m":
+			fmt.Printf("Move to midpoint\n")
+		default:
+			var steps int
+			n, err := fmt.Sscanf(text, "%d", &steps)
+			if err != nil || n != 1 {
+				fmt.Printf("Unrecognised input")
+			}
+		}
+	}
 }
