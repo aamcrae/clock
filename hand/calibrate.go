@@ -27,17 +27,17 @@ import (
 // and this is considered the reference point for the hand.
 // The hand processing is then started.
 func Calibrate(e *Encoder, h *Hand, reference, initial int) {
-    log.Printf("%s: Starting calibration", h.Name)
+	log.Printf("%s: Starting calibration", h.Name)
 	h.mover.Move(int(reference*2 + reference/2))
 	if e.Measured == 0 {
 		log.Fatalf("Unable to calibrate")
 	}
 	// Move to encoder reference position.
 	loc := e.getStep.GetStep()
-    log.Printf("%s: Calibration complete, moving to encoder midpoint (%d)", h.Name, e.Midpoint % e.Measured)
+	log.Printf("%s: Calibration complete, moving to encoder midpoint (%d)", h.Name, e.Midpoint%e.Measured)
 	h.mover.Move(int((loc % int64(e.Measured))) + e.Midpoint)
 	// The hand is at the midpoint of the encoder, so record the
 	// current location of the hand.
-    log.Printf("%s: Starting hand...", h.Name)
+	log.Printf("%s: Starting hand...", h.Name)
 	h.Run(initial)
 }

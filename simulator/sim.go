@@ -77,7 +77,7 @@ func main() {
 		time.Sleep(time.Second)
 		fmt.Printf("Waiting for initialisation to complete (%d/%d ready)\n", ready, len(hands))
 	}
-    fmt.Printf("Clock initialisation complete\n")
+	fmt.Printf("Clock initialisation complete\n")
 	var clk []*hand.Hand
 	for _, sh := range hands {
 		clk = append(clk, sh.hand)
@@ -124,7 +124,8 @@ func sim(index int) *SimHand {
 }
 
 // Move acts like a stepper motor, moving the hand
-// one step at a time.
+// one step at a time, and checking whether the hand
+// crosses an encoder edge.
 func (s *SimHand) Move(steps int) {
 	var e1, e2 int
 	var inc float64
