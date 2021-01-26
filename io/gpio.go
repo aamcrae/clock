@@ -31,6 +31,14 @@ const (
 	OUT = iota
 )
 
+// Edge
+const (
+	NONE    = iota // Default
+	RISING  = iota
+	FALLING = iota
+	BOTH    = iota
+)
+
 const (
 	baseDir       = "/sys/class/gpio/"
 	exportFile    = baseDir + "export"
@@ -42,7 +50,7 @@ const (
 const verifyTimeout = 2 * time.Second
 
 // Verify will wait for exported files to become writable.
-// This is necessary if the process is not running as root, since systemd
+// This is necessary if the process is not running as root - systemd
 // and udev will change the group permissions on the exported files, but
 // this takes some time to do. If we try and access the files before
 // the file group/modes are changed, we will get a permission error.
@@ -54,6 +62,8 @@ type Gpio struct {
 	value     *os.File
 	buf       []byte
 	direction int
+	edge      int
+	pollfd    []unix.PollFd
 }
 
 func init() {
@@ -93,11 +103,17 @@ func Pin(gpio int) (*Gpio, error) {
 		unexport(gpio)
 		return nil, err
 	}
+	err = g.Edge(NONE)
+	if err != nil {
+		unexport(gpio)
+		return nil, err
+	}
 	g.value, err = os.OpenFile(fmt.Sprintf("%s/gpio%d%s", baseDir, gpio, valueFile), os.O_RDWR, 0600)
 	if err != nil {
 		unexport(gpio)
 		return nil, err
 	}
+	g.pollfd = []unix.PollFd{{int32(g.value.Fd()), unix.POLLPRI | unix.POLLERR, 0}}
 	return g, nil
 }
 
@@ -115,6 +131,31 @@ func (g *Gpio) Direction(d int) error {
 	err := writeFile(fmt.Sprintf("%s/gpio%d/direction", baseDir, g.number), s)
 	if err == nil {
 		g.direction = d
+	}
+	return err
+}
+
+// Edge sets the edge detection on the GPIO pin.
+func (g *Gpio) Edge(e int) error {
+	if g.direction != IN {
+		return fmt.Errorf("gpio%d: not set as an input pin", g.number)
+	}
+	var s string
+	switch e {
+	case NONE:
+		s = "none"
+	case RISING:
+		s = "rising"
+	case FALLING:
+		s = "falling"
+	case BOTH:
+		s = "both"
+	default:
+		return fmt.Errorf("gpio%d: unknown direction", g.number)
+	}
+	err := writeFile(fmt.Sprintf("%s/gpio%d/edge", baseDir, g.number), s)
+	if err == nil {
+		g.edge = e
 	}
 	return err
 }
@@ -137,6 +178,15 @@ func (g *Gpio) Set(v int) error {
 
 // Get returns the current value of the GPIO pin.
 func (g *Gpio) Get() (int, error) {
+	if g.edge != NONE {
+		// Wait for edge using poll.
+		g.pollfd[0].Revents = 0
+		_, err := unix.Poll(g.pollfd, -1)
+		if err != nil {
+			return 0, err
+		}
+		// With no timeout, poll should always return an event.
+	}
 	_, err := g.value.ReadAt(g.buf, 0)
 	if err != nil {
 		return 0, err
