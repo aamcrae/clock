@@ -6,6 +6,7 @@
 *.dylib
 example/step
 example/step2
+example/watch
 example/example
 simulator/simulator
 clock
