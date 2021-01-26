@@ -112,6 +112,7 @@ func sim(index int) *SimHand {
 	p := &params[index]
 	sh := new(SimHand)
 	sh.encChan = make(chan int, 10)
+    sh.encChan <- 0
 	sh.reference = int64(p.reference)
 	sh.perstep = p.perstep
 	sh.actual = float64(p.reference) * p.perstep
