@@ -180,10 +180,20 @@ func (g *Gpio) Set(v int) error {
 func (g *Gpio) Get() (int, error) {
 	if g.edge != NONE {
 		// Wait for edge using poll.
-		g.pollfd[0].Revents = 0
-		_, err := unix.Poll(g.pollfd, -1)
-		if err != nil {
-			return 0, err
+		for {
+			g.pollfd[0].Revents = 0
+			_, err := unix.Poll(g.pollfd, -1)
+			switch err {
+			case nil:
+				// Successful call
+			case unix.EAGAIN:
+				continue
+			case unix.EINTR:
+				continue
+			default:
+				return 0, err
+			}
+			break
 		}
 		// With no timeout, poll should always return an event.
 	}

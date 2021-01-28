@@ -36,11 +36,15 @@ func main() {
 		log.Fatalf("Pin %d: edge BOTH: %v", *gpio, err)
 	}
 	defer p.Close()
+	last := -1
 	for {
 		v, err := p.Get()
 		if err != nil {
 			log.Fatalf("Pin %d: Get: %v", *gpio, err)
 		}
-		log.Printf("pin %d = %d\n", *gpio, v)
+		if v != last {
+			log.Printf("pin %d = %d\n", *gpio, v)
+			last = v
+		}
 	}
 }
