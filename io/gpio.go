@@ -38,11 +38,11 @@ const (
 )
 
 const (
-	baseDir       = "/sys/class/gpio/"
-	exportFile    = baseDir + "export"
-	unexportFile  = baseDir + "unexport"
-	directionFile = "/direction"
-	valueFile     = "/value"
+	gpioBaseDir       = "/sys/class/gpio/"
+	gpioExportFile    = gpioBaseDir + "export"
+	gpioUnexportFile  = gpioBaseDir + "unexport"
+	gpioDirectionFile = "/direction"
+	gpioValueFile     = "/value"
 )
 
 // Gpio represents one GPIO pin.
@@ -75,24 +75,24 @@ func Pin(gpio int) (*Gpio, error) {
 	g.number = gpio
 	g.buf = make([]byte, 1)
 
-	vFile := fmt.Sprintf("%s/gpio%d%s", baseDir, g, valueFile)
-	err := export(vFile, exportFile, g.number)
+	vFile := fmt.Sprintf("%sgpio%d%s", gpioBaseDir, gpio, gpioValueFile)
+	err := export(vFile, gpioExportFile, gpio)
 	if err != nil {
 		return nil, err
 	}
 	err = g.Direction(IN)
 	if err != nil {
-		unexport(unexportFile, gpio)
+		unexport(gpioUnexportFile, gpio)
 		return nil, err
 	}
 	err = g.Edge(NONE)
 	if err != nil {
-		unexport(unexportFile, gpio)
+		unexport(gpioUnexportFile, gpio)
 		return nil, err
 	}
-	g.value, err = os.OpenFile(fmt.Sprintf("%s/gpio%d%s", baseDir, gpio, valueFile), os.O_RDWR, 0600)
+	g.value, err = os.OpenFile(fmt.Sprintf("%s/gpio%d%s", gpioBaseDir, gpio, gpioValueFile), os.O_RDWR, 0600)
 	if err != nil {
-		unexport(unexportFile, gpio)
+		unexport(gpioUnexportFile, gpio)
 		return nil, err
 	}
 	g.pollfd = []unix.PollFd{{int32(g.value.Fd()), unix.POLLPRI | unix.POLLERR, 0}}
@@ -110,7 +110,7 @@ func (g *Gpio) Direction(d int) error {
 	default:
 		return fmt.Errorf("gpio%d: unknown direction", g.number)
 	}
-	err := writeFile(fmt.Sprintf("%s/gpio%d/direction", baseDir, g.number), s)
+	err := writeFile(fmt.Sprintf("%s/gpio%d/direction", gpioBaseDir, g.number), s)
 	if err == nil {
 		g.direction = d
 	}
@@ -135,7 +135,7 @@ func (g *Gpio) Edge(e int) error {
 	default:
 		return fmt.Errorf("gpio%d: unknown direction", g.number)
 	}
-	err := writeFile(fmt.Sprintf("%s/gpio%d/edge", baseDir, g.number), s)
+	err := writeFile(fmt.Sprintf("%s/gpio%d/edge", gpioBaseDir, g.number), s)
 	if err == nil {
 		g.edge = e
 	}
@@ -195,5 +195,5 @@ func (g *Gpio) Get() (int, error) {
 // Close the GPIO pin and unexport it.
 func (g *Gpio) Close() {
 	g.value.Close()
-	unexport(unexportFile, g.number)
+	unexport(gpioUnexportFile, g.number)
 }

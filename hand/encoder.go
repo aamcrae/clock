@@ -17,7 +17,6 @@
 package hand
 
 import (
-	"fmt"
 	"log"
 )
 
@@ -37,7 +36,7 @@ type IO interface {
 	Get() (int, error)
 }
 
-const debounce = 0
+const debounce = 5
 
 // Encoder is an interrupter encoder driver used to measure shaft rotations.
 // The count of current step values is used to track the
@@ -85,7 +84,6 @@ func (e *Encoder) driver() {
 		d := diff(loc, last)
 		last = loc
 		if debounce != 0 && d < debounce {
-			fmt.Printf("Debounce! loc = %d, d = %d\n", loc, d)
 			continue
 		}
 		// If transitioning from 0 to 1, remember this location as
@@ -95,14 +93,14 @@ func (e *Encoder) driver() {
 		} else if d >= e.size {
 			// Transitioned from 1 to 0, and the signal is large
 			// enough to be considered as the real encoder mark.
-			// Determine the midpoint of the encoder mark.
-			e.Midpoint = int((loc-start)/2 + start)
 			if lastMid > 0 {
 				// If the last sensor midpoint is known,
 				// calculate the difference between the current
 				// midpoint and the previous.
 				// This is the measured number of steps in a revolution.
 				e.Measured = int(diff(lastMid, loc))
+				// Determine the midpoint of the encoder mark.
+				e.Midpoint = int((loc-start)/2 + start) % e.Measured
 				if lastMeasured != e.Measured {
 					// If the number of steps in a revolution has
 					// changed, update the interested party.

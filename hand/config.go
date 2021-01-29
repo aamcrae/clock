@@ -131,7 +131,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		inp.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(c.stepper, c.Hand, inp, int(hc.Steps))
+	c.Encoder = NewEncoder(c.stepper, c.Hand, inp, 100)
 	return c, nil
 }
 
@@ -160,8 +160,9 @@ func Calibrate(run bool, e *Encoder, h *Hand, reference, initial int) {
 	}
 	// Move to encoder reference position.
 	loc := e.getStep.GetStep()
-	log.Printf("%s: Calibration complete, moving to encoder midpoint (%d)", h.Name, e.Midpoint%e.Measured)
-	h.mover.Move(int((loc % int64(e.Measured))) + e.Midpoint)
+	log.Printf("%s: Calibration complete (%d steps), moving to midpoint (%d)", h.Name, e.Measured, e.Midpoint)
+	steps := e.Midpoint - int(loc % int64(e.Measured))
+	h.mover.Move(steps)
 	// The hand is at the midpoint of the encoder, so the hand is
 	// at a known physical location, which is set as the initial position.
 	h.Current = initial
