@@ -44,6 +44,7 @@ func NewHwPWM(unit int) (* HwPwm, error) {
 	p := new(HwPwm)
 	p.unit = unit
 	p.base = fmt.Sprintf("%spwm%d", pwmBaseDir, unit)
+	p.period = -1
 	p.duty = -1
 
 	vFile := fmt.Sprintf("%s%s", p.base, periodFile)
@@ -56,7 +57,14 @@ func NewHwPWM(unit int) (* HwPwm, error) {
 		unexport(pwmUnexportFile, unit)
 		return nil, err
 	}
-	p.dFile, err = os.OpenFile(fmt.Sprintf("%s%s", p.base, dutyFile), os.O_RDWR, 0600)
+	dName := fmt.Sprintf("%s%s", p.base, dutyFile)
+	err = verifyFile(dName)
+	if err != nil {
+		p.pFile.Close()
+		unexport(pwmUnexportFile, unit)
+		return nil, err
+	}
+	p.dFile, err = os.OpenFile(dName, os.O_RDWR, 0600)
 	if err != nil {
 		p.pFile.Close()
 		unexport(pwmUnexportFile, unit)
@@ -76,6 +84,7 @@ func NewHwPWM(unit int) (* HwPwm, error) {
 
 // Close closes the PWM controller
 func (p *HwPwm) Close() {
+	writeFile(fmt.Sprintf("%s%s", p.base, enableFile), "0")
 	p.pFile.Close()
 	p.dFile.Close()
 	unexport(pwmUnexportFile, p.unit)
