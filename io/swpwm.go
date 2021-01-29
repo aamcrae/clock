@@ -19,20 +19,25 @@ import (
 	"time"
 )
 
+type PWM interface {
+	Close()
+	Set(time.Duration, int) error
+}
+
 type pwmMsg struct {
 	period time.Duration
 	duty int	// Duty cycle as percentage
 	stop  chan bool
 }
 
-type PWM struct {
+type swPwm struct {
 	pin Setter
 	c               chan pwmMsg
 }
 
 // NewPWM creates a new s/w PWM controller.
-func NewPWM(pin Setter) (* PWM) {
-	p := new(PWM)
+func NewSwPWM(pin Setter) (* swPwm) {
+	p := new(swPwm)
 	p.pin = pin
 	p.c = make(chan pwmMsg, 1)
 	go p.handler()
@@ -40,7 +45,7 @@ func NewPWM(pin Setter) (* PWM) {
 }
 
 // Close closes the PWM controller
-func (p *PWM) Close() {
+func (p *swPwm) Close() {
 	sc := make(chan bool)
 	p.c <- pwmMsg{0, 0, sc}
 	<-sc
@@ -50,7 +55,7 @@ func (p *PWM) Close() {
 
 // Set sets the PWM parameters. The changes take
 // place at the end of the current period.
-func (p *PWM) Set(period time.Duration, duty int) error {
+func (p *swPwm) Set(period time.Duration, duty int) error {
 	if duty < 0 || duty > 100 {
 		return fmt.Errorf("%d: invalid duty cycle percentage")
 	}
@@ -60,7 +65,7 @@ func (p *PWM) Set(period time.Duration, duty int) error {
 
 // goroutine handler
 // Listens on message channel, and runs the PWM.
-func (p *PWM) handler() {
+func (p *swPwm) handler() {
 	var on, off time.Duration
 	off = time.Millisecond * 5
 	current := 0

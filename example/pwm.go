@@ -25,16 +25,14 @@ import (
 	"github.com/aamcrae/clock/io"
 )
 
-var pwmPin = flag.Int("gpio", 18, "GPIO pin for PWM example")
+var pwmUnit = flag.Int("pwm", 0, "PWM unit for PWM example")
 
 func main() {
 	flag.Parse()
-	pin, err := io.OutputPin(*pwmPin)
+	pwm, err := io.NewHwPWM(*pwmUnit)
 	if err != nil {
-		log.Fatalf("Pin %d: %v", *pwmPin, err)
+		log.Fatalf("PWM unit %d: %v", *pwmUnit, err)
 	}
-	defer pin.Close()
-	pwm := io.NewPWM(pin)
 	defer pwm.Close()
 	for i := 0; i < 10; i++ {
 		for v := 0; v < 90; v++ {
@@ -46,7 +44,7 @@ func main() {
 	}
 }
 
-func set(pwm *io.PWM, v int) {
+func set(pwm io.PWM, v int) {
 	period := time.Millisecond * 2
 	r := float64(v) * math.Pi / 180
 	d := int(math.Sin(r) * 100.0)

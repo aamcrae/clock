@@ -19,8 +19,6 @@ package io
 import (
 	"fmt"
 	"os"
-	"os/user"
-	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -47,15 +45,6 @@ const (
 	valueFile     = "/value"
 )
 
-const verifyTimeout = 2 * time.Second
-
-// Verify will wait for exported files to become writable.
-// This is necessary if the process is not running as root - systemd
-// and udev will change the group permissions on the exported files, but
-// this takes some time to do. If we try and access the files before
-// the file group/modes are changed, we will get a permission error.
-var Verify = false
-
 // Gpio represents one GPIO pin.
 type Gpio struct {
 	number    int
@@ -64,14 +53,6 @@ type Gpio struct {
 	direction int
 	edge      int
 	pollfd    []unix.PollFd
-}
-
-func init() {
-	// If the user is not root, enable Verify mode
-	u, err := user.Current()
-	if err == nil && u.Uid != "0" {
-		Verify = true
-	}
 }
 
 // OutputPin opens a GPIO pin and sets the direction as OUTPUT.
@@ -94,23 +75,24 @@ func Pin(gpio int) (*Gpio, error) {
 	g.number = gpio
 	g.buf = make([]byte, 1)
 
-	err := export(g.number)
+	vFile := fmt.Sprintf("%s/gpio%d%s", baseDir, g, valueFile)
+	err := export(vFile, exportFile, g.number)
 	if err != nil {
 		return nil, err
 	}
 	err = g.Direction(IN)
 	if err != nil {
-		unexport(gpio)
+		unexport(unexportFile, gpio)
 		return nil, err
 	}
 	err = g.Edge(NONE)
 	if err != nil {
-		unexport(gpio)
+		unexport(unexportFile, gpio)
 		return nil, err
 	}
 	g.value, err = os.OpenFile(fmt.Sprintf("%s/gpio%d%s", baseDir, gpio, valueFile), os.O_RDWR, 0600)
 	if err != nil {
-		unexport(gpio)
+		unexport(unexportFile, gpio)
 		return nil, err
 	}
 	g.pollfd = []unix.PollFd{{int32(g.value.Fd()), unix.POLLPRI | unix.POLLERR, 0}}
@@ -213,47 +195,5 @@ func (g *Gpio) Get() (int, error) {
 // Close the GPIO pin and unexport it.
 func (g *Gpio) Close() {
 	g.value.Close()
-	unexport(g.number)
-}
-
-func unexport(g int) error {
-	return writeFile(unexportFile, fmt.Sprintf("%d", g))
-}
-
-func export(g int) error {
-	// Check if directory and files already exist.
-	val := fmt.Sprintf("%s/gpio%d%s", baseDir, g, valueFile)
-	err := unix.Access(val, unix.W_OK|unix.R_OK)
-	if err == nil {
-		return nil
-	}
-	err = writeFile(exportFile, fmt.Sprintf("%d", g))
-	if err == nil && Verify {
-		return verifyFile(val)
-	}
-	return err
-}
-
-func writeFile(fname, s string) error {
-	f, err := os.OpenFile(fname, os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.Write([]byte(s))
-	return err
-}
-
-// Wait for file to become writable
-func verifyFile(f string) error {
-	var tout time.Duration
-	sl := time.Millisecond
-	for tout = 0; tout < verifyTimeout; tout += sl {
-		err := unix.Access(f, unix.W_OK)
-		if err == nil {
-			return nil
-		}
-		time.Sleep(sl)
-	}
-	return fmt.Errorf("%s: not writable", f)
+	unexport(unexportFile, g.number)
 }
