@@ -91,43 +91,42 @@ func (p *HwPwm) Close() {
 }
 
 // Set sets the PWM parameters.
-// Assumes hardware clock is 1 MHz.
 func (p *HwPwm) Set(period time.Duration, duty int) error {
 	if duty < 0 || duty > 100 {
 		return fmt.Errorf("%d: invalid duty cycle percentage")
 	}
-	pMicro := period.Nanoseconds()
-	if pMicro <= 0 {
+	pNano := period.Nanoseconds()
+	if pNano < 15 {
 		return fmt.Errorf("invalid period")
 	}
-	dMicro := pMicro * int64(duty) / 100
+	dNano := pNano * int64(duty) / 100
 	// When writing the period and duty cycle, the order may be important
 	// since duty cycle must not be greater than the current period.
-	if dMicro > p.period {
+	if dNano > p.period {
 		// Write period first
-		_, err := p.pFile.WriteAt([]byte(fmt.Sprintf("%d", pMicro)), 0)
+		_, err := p.pFile.WriteAt([]byte(fmt.Sprintf("%d", pNano)), 0)
 		if err != nil {
 			return err
 		}
-		_, err = p.dFile.WriteAt([]byte(fmt.Sprintf("%d", dMicro)), 0)
+		_, err = p.dFile.WriteAt([]byte(fmt.Sprintf("%d", dNano)), 0)
 		if err != nil {
 			return err
 		}
 	} else {
-		if dMicro != p.duty {
-			_, err := p.dFile.WriteAt([]byte(fmt.Sprintf("%d", dMicro)), 0)
+		if dNano != p.duty {
+			_, err := p.dFile.WriteAt([]byte(fmt.Sprintf("%d", dNano)), 0)
 			if err != nil {
 				return err
 			}
 		}
-		if pMicro != p.period {
-			_, err := p.pFile.WriteAt([]byte(fmt.Sprintf("%d", pMicro)), 0)
+		if pNano != p.period {
+			_, err := p.pFile.WriteAt([]byte(fmt.Sprintf("%d", pNano)), 0)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	p.period = pMicro
-	p.duty = dMicro
+	p.period = pNano
+	p.duty = dNano
 	return nil
 }

@@ -45,7 +45,7 @@ func main() {
 }
 
 func set(pwm io.PWM, v int) {
-	period := time.Millisecond * 2
+	period := time.Millisecond * 1
 	r := float64(v) * math.Pi / 180
 	d := int(math.Sin(r) * 100.0)
 	err := pwm.Set(period, d)
