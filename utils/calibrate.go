@@ -69,8 +69,8 @@ func main() {
 			steps = enc.Measured - enc.Location()
 			clk.Move(steps)
 		case "o":
-			fmt.Printf("Move to offset (%d) from %d\n", hc.Initial, enc.Location())
-			steps = diff(enc.Location(), hc.Initial, enc.Measured)
+			fmt.Printf("Move to offset (%d) from %d\n", hc.Offset, enc.Location())
+			steps = diff(enc.Location(), hc.Offset, enc.Measured)
 			clk.Move(steps)
 		default:
 			n, err := fmt.Sscanf(text, "%d", &steps)

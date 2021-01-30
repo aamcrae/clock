@@ -35,6 +35,9 @@ type msg struct {
 // Stepper represents a stepper motor.
 // All actual stepping is done in a background goroutine, so requests can be queued.
 // All step values assume half-steps.
+// The current step number is maintained as an absolute number, referenced from
+// 0 when the stepper is first initialised. This can be a negative or positive number,
+// depending on the movement.
 type Stepper struct {
 	pin1, pin2, pin3, pin4 Setter
 	factor                 float64
@@ -42,7 +45,7 @@ type Stepper struct {
 	stopChan               chan bool
 	index                  int   // Index to step sequence
 	on                     bool  // true if motor drivers on
-	current                int64 // Current step number
+	current                int64 // Current step number as an absolute number
 }
 
 // Half step sequence of outputs.
@@ -57,8 +60,9 @@ var sequence = [][]int{
 	[]int{1, 0, 0, 1},
 }
 
-// NewStepper creates and initialises a Stepper struct
-// rev is the number of half steps per revolution.
+// NewStepper creates and initialises a Stepper struct.
+// rev is the number of steps per revolution as a reference value for
+// determining the delays between steps.
 func NewStepper(rev int, pin1, pin2, pin3, pin4 Setter) *Stepper {
 	s := new(Stepper)
 	// Precalculate a timing factor so that a RPM value can be used
@@ -74,7 +78,7 @@ func NewStepper(rev int, pin1, pin2, pin3, pin4 Setter) *Stepper {
 	return s
 }
 
-// Close stops the motor and frees any resources
+// Close stops the motor and frees any resources.
 func (s *Stepper) Close() {
 	s.Stop()
 	close(s.mChan)
@@ -90,7 +94,7 @@ func (s *Stepper) State() int {
 }
 
 // GetStep returns the current step number, which is an accumulative
-// signed value representing the steps moved.
+// signed value representing the steps moved, with 0 as the starting location.
 func (s *Stepper) GetStep() int64 {
 	return atomic.LoadInt64(&s.current)
 }
@@ -100,7 +104,7 @@ func (s *Stepper) Restore(i int) {
 	s.index = i & 7
 }
 
-// Off turns off the GPIOs to save power and reduce load on motor
+// Off turns off the GPIOs to remove the power from the motor.
 func (s *Stepper) Off() {
 	if s.on {
 		s.Wait()
@@ -166,8 +170,10 @@ func (s *Stepper) handler() {
 	}
 }
 
-// step runs the motor.
-// A stop channel can be used to abort the sequence.
+// step controls the motor via the GPIOs, to move the motor the
+// requested number of steps. A negative value moves the motor
+// counter-clockwise, positive moves the motor clockwise.
+// Once started, a stop channel is used to abort the sequence.
 func (s *Stepper) step(rpm float64, steps int) bool {
 	inc := 1
 	if steps < 0 {
@@ -218,7 +224,7 @@ func (s *Stepper) flush() {
 	}
 }
 
-// Set the GPIO outputs
+// Set the GPIO outputs according to the current sequence index.
 func (s *Stepper) output() {
 	seq := sequence[s.index]
 	s.pin1.Set(seq[0])

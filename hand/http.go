@@ -31,7 +31,7 @@ import (
 var clockface = flag.String("clockface", "clock-face.jpg", "Clock face JPEG file")
 var refresh = flag.Int("refresh", 10, "Refresh status page number of seconds")
 
-type handParams struct {
+type handDraw struct {
 	r      float64
 	g      float64
 	b      float64
@@ -39,7 +39,7 @@ type handParams struct {
 	width  int
 }
 
-var handDraw map[string]handParams = map[string]handParams{
+var handMap map[string]handDraw = map[string]handDraw{
 	"hours":   {0, 0, 1, 400, 30},
 	"minutes": {0, 0, 1, 600, 10},
 	"seconds": {1, 0, 0, 600, 2},
@@ -48,6 +48,8 @@ var handDraw map[string]handParams = map[string]handParams{
 const midX = 641
 const midY = 646
 
+// ClockServer starts a HTTP server that displays a clock face and
+// status information about the clock.
 func ClockServer(port int, clock []*Hand) {
 	inf, err := os.Open(*clockface)
 	if err != nil {
@@ -66,12 +68,13 @@ func ClockServer(port int, clock []*Hand) {
 	log.Fatal(server.ListenAndServe())
 }
 
+// Display the clock face with the current location of the hands drawn upon it.
 func handler(clock []*Hand, img image.Image) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		c := gg.NewContextForImage(img)
 		for _, h := range clock {
-			hd, ok := handDraw[h.Name]
+			hd, ok := handMap[h.Name]
 			if ok {
 				c.SetRGB(hd.r, hd.g, hd.b)
 				drawHand(c, h, hd.length, hd.width)
@@ -97,6 +100,7 @@ func drawHand(c *gg.Context, h *Hand, length, width int) {
 	c.Stroke()
 }
 
+// status displays the status of each hand of the clock.
 func status(clock []*Hand) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")

@@ -23,7 +23,7 @@ import (
 	"github.com/aamcrae/config"
 )
 
-// Configuration data for the hand.
+// Configuration data for the clock hand, read from a configuration file.
 type ClockConfig struct {
 	Name    string
 	Gpio    []int
@@ -33,9 +33,15 @@ type ClockConfig struct {
 	Steps   int
 	Encoder int
 	Notch   int
-	Initial int
+	Offset  int
 }
 
+// ClockHand combines the I/O for a hand and an encoder.
+// A clock is comprised of multiple hands, each of which runs independently.
+// Each clock hand consists of a Hand which generates move requests according to the current time,
+// an Encoder which provides feedback as to the actual location of the hand, and the
+// I/O for these controllers.
+// A config for each hand is parsed from a configuration file.
 type ClockHand struct {
 	Stepper *io.Stepper
 	Input   *io.Gpio
@@ -44,15 +50,16 @@ type ClockHand struct {
 	Config  *ClockConfig
 }
 
-// Config reads and validates a hand config from a config file section.
+// Config reads and validates a ClockHand config from a config file section.
 // Sample config:
-//  stepper=4,17,27,22,3.0   # GPIOs for stepper, and speed in RPM
+//  [name]                   # name of hand e.g hours, minutes, seconds
+//  stepper=4,17,27,22,3.0   # GPIOs for stepper motor, and speed in RPM
 //  period=12h               # The clock period for this hand
-//  update=5m                # The update rate
+//  update=5m                # The update rate as a duration
 //  steps=4096               # Reference number of steps in a revolution
 //  encoder=21               # GPIO for encoder
 //  notch=100                # Min width of sensor mark
-//  initial=2100             # The position of the hand at the sensor midpoint
+//  offset=2100              # The offset of the hand at the sensor mark
 func Config(conf *config.Config, name string) (*ClockConfig, error) {
 	s := conf.GetSection(name)
 	if s == nil {
@@ -106,18 +113,18 @@ func Config(conf *config.Config, name string) (*ClockConfig, error) {
 	if n != 1 {
 		return nil, fmt.Errorf("notch: argument count")
 	}
-	n, err = s.Parse("initial", "%d", &h.Initial)
+	n, err = s.Parse("offset", "%d", &h.Offset)
 	if err != nil {
-		return nil, fmt.Errorf("initial: %v", err)
+		return nil, fmt.Errorf("offset: %v", err)
 	}
 	if n != 1 {
-		return nil, fmt.Errorf("initial: argument count")
+		return nil, fmt.Errorf("offset: argument count")
 	}
 	return &h, nil
 }
 
-// NewClockHand initialises the stepper and encoder from the
-// clock configuration.
+// NewClockHand initialises the I/O, Hand, and Encoder from the
+// hand configuration.
 func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 	c := new(ClockHand)
 	c.Config = hc
@@ -141,10 +148,13 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		c.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(c.Stepper, c.Hand, c.Input, hc.Notch, hc.Initial)
+	c.Encoder = NewEncoder(c.Stepper, c.Hand, c.Input, hc.Notch, hc.Offset)
 	return c, nil
 }
 
+// Run starts the clock hand, initially running a calibration so that
+// the encoder mark position can be discovered, and then starting the
+// hand processing if requested.
 func (c *ClockHand) Run() {
 	Calibrate(true, c.Encoder, c.Hand, c.Config.Steps)
 }
@@ -159,7 +169,7 @@ func (c *ClockHand) Move(steps int) {
 	}
 }
 
-// Close shutdowns the clock hand
+// Close shuts down the clock hand and release the resources.
 func (c *ClockHand) Close() {
 	if c.Stepper != nil {
 		c.Stepper.Close()
@@ -169,11 +179,12 @@ func (c *ClockHand) Close() {
 	}
 }
 
-// Calibrate moves the hand at least 2 1/2 revolutions to
-// allow the encoder to measure the actual steps required
-// for 360 degrees of movement.
-// Once that is known, the hand is moved to the midpoint of the encoder,
+// Calibrate moves the hand at least 2 1/2 revolutions to allow
+// the encoder to measure the actual steps for 360 degrees of movement.
+// Once that is known, the hand is moved to the encoder mark,
 // and this is considered the initial location for the hand.
+// An offset may be applied that indicates the physical location of the
+// hand when the encoder is at the mark.
 func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	log.Printf("%s: Starting calibration", h.Name)
 	h.mover.Move(int(reference*2 + reference/2))
