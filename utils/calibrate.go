@@ -51,7 +51,7 @@ func main() {
 	enc := clk.Encoder
 	var steps int
 	for {
-		fmt.Printf("Location %d (size %d), encoder mark offset %d\n", enc.Location(), enc.Measured, diff(enc.Location(), 0, enc.Measured))
+		fmt.Printf("Location %d (size %d), encoder mark offset %d\n", enc.Location(), enc.Measured, diff(0, enc.Location(), enc.Measured))
 		fmt.Print("Enter steps or command ('help' for help) ")
 		text, _ := reader.ReadString('\n')
 		text = strings.TrimSuffix(text, "\n")
@@ -74,7 +74,7 @@ func main() {
 			clk.Move(steps)
 		default:
 			n, err := fmt.Sscanf(text, "%d", &steps)
-			if err != nil || n != 1 || steps <= 0 {
+			if err != nil || n != 1 {
 				fmt.Printf("Unrecognised input\n")
 			} else {
 				fmt.Printf("Moving %d steps\n", steps)
@@ -87,7 +87,7 @@ func main() {
 func diff(a, b, o int) int {
 	a %= o
 	b %= o
-	d := b - a
+	d := a - b
 	if d < 0 {
 		d += o
 	}
