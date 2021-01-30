@@ -28,7 +28,7 @@ type MoveHand interface {
 
 // Hand represents a clock hand. A single revolution of the hand
 // is represented by the number of ticks. Updating the clock
-// will move the hand by one tick each time.
+// moves the hand by one tick each time.
 // Moving is done by sending a +/- step count to a mover.
 // The number of steps in a single revolution is held in adjusted,
 // which is initially set from a reference value, and can be
@@ -118,8 +118,7 @@ func (h *Hand) target(t time.Time) int {
 	mod := (target / h.divisor)
 	mt := mod % h.ticks
 	// Round up.
-	st := (mt*h.adjusted + h.ticks/2) / h.ticks
-	return st
+	return (mt*h.adjusted + h.ticks/2) / h.ticks
 }
 
 // Sync time to the boundary of the update interval so that the

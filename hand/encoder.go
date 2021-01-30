@@ -48,7 +48,7 @@ type Encoder struct {
 	enc      IO    // I/O from encoder hardware
 	Invert   bool  // Invert input signal
 	Measured int   // Measured steps per revolution
-	size     int64 // Minimum size of sensor gap
+	size     int64 // Minimum span of sensor mark
 	Midpoint int   // Midpoint of sensor.
 }
 
@@ -66,7 +66,7 @@ func NewEncoder(stepper GetStep, adj Adjuster, io IO, size int) *Encoder {
 // driver is the main goroutine for servicing the encoder.
 func (e *Encoder) driver() {
 	last := int64(0)
-	lastMid := int64(-1)
+	lastEdge := int64(-1)
 	lastMeasured := 0
 	start := int64(-1)
 	for {
@@ -93,12 +93,12 @@ func (e *Encoder) driver() {
 		} else if d >= e.size {
 			// Transitioned from 1 to 0, and the signal is large
 			// enough to be considered as the real encoder mark.
-			if lastMid > 0 {
-				// If the last sensor midpoint is known,
+			if lastEdge > 0 {
+				// If the last sensor edge is known,
 				// calculate the difference between the current
-				// midpoint and the previous.
+				// edge and the previous.
 				// This is the measured number of steps in a revolution.
-				e.Measured = int(diff(lastMid, loc))
+				e.Measured = int(diff(lastEdge, loc))
 				// Determine the midpoint of the encoder mark.
 				e.Midpoint = int((loc-start)/2 + start) % e.Measured
 				if lastMeasured != e.Measured {
@@ -108,7 +108,7 @@ func (e *Encoder) driver() {
 					lastMeasured = e.Measured
 				}
 			}
-			lastMid = loc
+			lastEdge = loc
 		}
 	}
 }

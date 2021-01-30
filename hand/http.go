@@ -29,6 +29,7 @@ import (
 )
 
 var clockface = flag.String("clockface", "clock-face.jpg", "Clock face JPEG file")
+var refresh = flag.Int("refresh", 30, "Refresh status page number of seconds")
 
 var handDraw = []struct {
 	r      float64
@@ -56,6 +57,7 @@ func ClockServer(port int, clock []*Hand) {
 		log.Fatalf("%s: %v", *clockface, err)
 	}
 	http.Handle("/clock.jpg", http.HandlerFunc(handler(clock, img)))
+	http.Handle("/status", http.HandlerFunc(status(clock)))
 	url := fmt.Sprintf(":%d", port)
 	log.Printf("Starting server on %s", url)
 	server := &http.Server{Addr: url}
@@ -88,4 +90,22 @@ func drawHand(c *gg.Context, h *Hand, length, width int) {
 	c.SetLineWidth(float64(width))
 	c.DrawLine(float64(midX), float64(midY), x, y)
 	c.Stroke()
+}
+
+func status(clock []*Hand) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, "<html><head>")
+		if *refresh != 0 {
+			fmt.Fprintf(w, "<meta http-equiv=\"refresh\" content=\"%d\">", *refresh)
+		}
+		fmt.Fprintf(w, "</head><body><h1>Status</h1>")
+		for _, h := range clock {
+			fmt.Fprintf(w, "%s: ", h.Name)
+			p, r := h.Position()
+			fmt.Fprintf(w, "position: %d face size: %d<br>", p, r)
+		}
+		fmt.Fprintf(w, "<p><a href=\"clock.jpg\">clock face</a><br>")
+		fmt.Fprintf(w, "</body>")
+	}
 }

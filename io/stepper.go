@@ -100,7 +100,7 @@ func (s *Stepper) Restore(i int) {
 	s.index = i & 7
 }
 
-// Off turns off the GPIOs to save power
+// Off turns off the GPIOs to save power and reduce load on motor
 func (s *Stepper) Off() {
 	if s.on {
 		s.Wait()
@@ -120,7 +120,7 @@ func (s *Stepper) Stop() {
 
 // Step queues a request to step the motor at the RPM selected for the
 // number of half-steps.
-// If steps is positive, then the motor is run clockwise, otherwise ccw.
+// If halfSteps is positive, then the motor is run clockwise, otherwise ccw.
 // A number of requests can be queued.
 func (s *Stepper) Step(rpm float64, halfSteps int) {
 	if halfSteps != 0 && rpm > 0.0 {

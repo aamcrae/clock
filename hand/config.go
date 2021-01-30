@@ -32,6 +32,7 @@ type ClockConfig struct {
 	Update  time.Duration
 	Steps   int
 	Encoder int
+	Notch	int
 	Initial int
 }
 
@@ -44,11 +45,13 @@ type ClockHand struct {
 
 // Config reads and validates a hand config from a config file section.
 // Sample config:
-//  stepper=4,17,27,22,3.0
-//  period=12h
-//  update=5m
-//  steps=4096
-//  initial=2100
+//  stepper=4,17,27,22,3.0   # GPIOs for stepper, and speed in RPM
+//  period=12h               # The clock period for this hand
+//  update=5m                # The update rate
+//  steps=4096               # Reference number of steps in a revolution
+//  encoder=21               # GPIO for encoder
+//  notch=100                # Min width of sensor mark
+//  initial=2100             # The position of the hand at the sensor midpoint
 func Config(conf *config.Config, name string) (*ClockConfig, error) {
 	s := conf.GetSection(name)
 	if s == nil {
@@ -95,6 +98,13 @@ func Config(conf *config.Config, name string) (*ClockConfig, error) {
 	if n != 1 {
 		return nil, fmt.Errorf("encoder: argument count")
 	}
+	n, err = s.Parse("notch", "%d", &h.Notch)
+	if err != nil {
+		return nil, fmt.Errorf("notch: %v", err)
+	}
+	if n != 1 {
+		return nil, fmt.Errorf("notch: argument count")
+	}
 	n, err = s.Parse("initial", "%d", &h.Initial)
 	if err != nil {
 		return nil, fmt.Errorf("initial: %v", err)
@@ -131,7 +141,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		inp.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(c.stepper, c.Hand, inp, 100)
+	c.Encoder = NewEncoder(c.stepper, c.Hand, inp, hc.Notch)
 	return c, nil
 }
 
@@ -139,7 +149,9 @@ func (c *ClockHand) Run() {
 	Calibrate(true, c.Encoder, c.Hand, c.Config.Steps, c.Config.Initial)
 }
 
-// Move moves the stepper motor the steps indicated.
+// Move moves the stepper motor the steps indicated. This is a
+// shim between the hand and the stepper so that the motor can be
+// turned off between movements.
 func (c *ClockHand) Move(steps int) {
 	if c.stepper != nil {
 		c.stepper.Step(c.Config.Speed, steps)
@@ -151,7 +163,7 @@ func (c *ClockHand) Move(steps int) {
 // allow the encoder to measure the actual steps required
 // for 360 degrees of movement.
 // Once that is known, the hand is moved to the midpoint of the encoder,
-// and this is considered the reference point for the hand.
+// and this is considered the initial location for the hand.
 func Calibrate(run bool, e *Encoder, h *Hand, reference, initial int) {
 	log.Printf("%s: Starting calibration", h.Name)
 	h.mover.Move(int(reference*2 + reference/2))
