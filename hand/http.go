@@ -29,18 +29,20 @@ import (
 )
 
 var clockface = flag.String("clockface", "clock-face.jpg", "Clock face JPEG file")
-var refresh = flag.Int("refresh", 30, "Refresh status page number of seconds")
+var refresh = flag.Int("refresh", 10, "Refresh status page number of seconds")
 
-var handDraw = []struct {
+type handParams struct {
 	r      float64
 	g      float64
 	b      float64
 	length int
 	width  int
-}{
-	{0, 0, 1, 400, 30},
-	{0, 0, 1, 600, 10},
-	{1, 0, 0, 600, 2},
+}
+
+var handDraw map[string]handParams = map[string]handParams{
+	"hours":   {0, 0, 1, 400, 30},
+	"minutes": {0, 0, 1, 600, 10},
+	"seconds": {1, 0, 0, 600, 2},
 }
 
 const midX = 641
@@ -68,9 +70,12 @@ func handler(clock []*Hand, img image.Image) func(http.ResponseWriter, *http.Req
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		c := gg.NewContextForImage(img)
-		for i, h := range clock {
-			c.SetRGB(handDraw[i].r, handDraw[i].g, handDraw[i].b)
-			drawHand(c, h, handDraw[i].length, handDraw[i].width)
+		for _, h := range clock {
+			hd, ok := handDraw[h.Name]
+			if ok {
+				c.SetRGB(hd.r, hd.g, hd.b)
+				drawHand(c, h, hd.length, hd.width)
+			}
 		}
 		err := jpeg.Encode(w, c.Image(), nil)
 		if err != nil {

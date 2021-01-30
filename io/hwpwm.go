@@ -21,26 +21,25 @@ import (
 )
 
 const (
-	pwmBaseDir       = "/sys/class/pwm/pwmchip0/"
-	pwmExportFile    = pwmBaseDir + "export"
-	pwmUnexportFile  = pwmBaseDir + "unexport"
-	periodFile     = "/period"
-	dutyFile     = "/duty_cycle"
-	enableFile     = "/enable"
+	pwmBaseDir      = "/sys/class/pwm/pwmchip0/"
+	pwmExportFile   = pwmBaseDir + "export"
+	pwmUnexportFile = pwmBaseDir + "unexport"
+	periodFile      = "/period"
+	dutyFile        = "/duty_cycle"
+	enableFile      = "/enable"
 )
 
-
 type HwPwm struct {
-	unit    int
-	base string
-	pFile   *os.File
-	dFile   *os.File
+	unit   int
+	base   string
+	pFile  *os.File
+	dFile  *os.File
 	period int64
 	duty   int64
 }
 
 // NewHwPWM creates a new hardware PWM controller.
-func NewHwPWM(unit int) (* HwPwm, error) {
+func NewHwPWM(unit int) (*HwPwm, error) {
 	p := new(HwPwm)
 	p.unit = unit
 	p.base = fmt.Sprintf("%spwm%d", pwmBaseDir, unit)
@@ -71,7 +70,7 @@ func NewHwPWM(unit int) (* HwPwm, error) {
 		return nil, err
 	}
 	// Default settings
-	p.Set(time.Millisecond * 100, 0)
+	p.Set(time.Millisecond*100, 0)
 	err = writeFile(fmt.Sprintf("%s%s", p.base, enableFile), "1")
 	if err != nil {
 		p.pFile.Close()

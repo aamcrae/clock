@@ -100,10 +100,11 @@ func (e *Encoder) driver() {
 				// This is the measured number of steps in a revolution.
 				e.Measured = int(diff(lastEdge, loc))
 				// Determine the midpoint of the encoder mark.
-				e.Midpoint = int((loc-start)/2 + start) % e.Measured
+				e.Midpoint = int((loc-start)/2+start) % e.Measured
 				if lastMeasured != e.Measured {
 					// If the number of steps in a revolution has
 					// changed, update the interested party.
+					log.Printf("Adjust to %d (old %d)", e.Measured, lastMeasured)
 					e.adjust.Adjust(e.Measured)
 					lastMeasured = e.Measured
 				}

@@ -26,17 +26,17 @@ type PWM interface {
 
 type pwmMsg struct {
 	period time.Duration
-	duty int	// Duty cycle as percentage
-	stop  chan bool
+	duty   int // Duty cycle as percentage
+	stop   chan bool
 }
 
 type swPwm struct {
 	pin Setter
-	c               chan pwmMsg
+	c   chan pwmMsg
 }
 
 // NewPWM creates a new s/w PWM controller.
-func NewSwPWM(pin Setter) (* swPwm) {
+func NewSwPWM(pin Setter) *swPwm {
 	p := new(swPwm)
 	p.pin = pin
 	p.c = make(chan pwmMsg, 1)

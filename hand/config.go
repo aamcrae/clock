@@ -32,12 +32,13 @@ type ClockConfig struct {
 	Update  time.Duration
 	Steps   int
 	Encoder int
-	Notch	int
+	Notch   int
 	Initial int
 }
 
 type ClockHand struct {
-	stepper *io.Stepper
+	Stepper *io.Stepper
+	Input   *io.Gpio
 	Hand    *Hand
 	Encoder *Encoder
 	Config  *ClockConfig
@@ -128,20 +129,19 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 			return nil, fmt.Errorf("Pin %d: %v", v, err)
 		}
 	}
-	c.stepper = io.NewStepper(hc.Steps, gp[0], gp[1], gp[2], gp[3])
+	c.Stepper = io.NewStepper(hc.Steps, gp[0], gp[1], gp[2], gp[3])
 	c.Hand = NewHand(hc.Name, hc.Period, c, hc.Update, int(hc.Steps))
-	inp, err := io.Pin(hc.Encoder)
+	c.Input, err = io.Pin(hc.Encoder)
 	if err != nil {
-		c.stepper.Close()
+		c.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	err = inp.Edge(io.BOTH)
+	err = c.Input.Edge(io.BOTH)
 	if err != nil {
-		c.stepper.Close()
-		inp.Close()
+		c.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(c.stepper, c.Hand, inp, hc.Notch)
+	c.Encoder = NewEncoder(c.Stepper, c.Hand, c.Input, hc.Notch)
 	return c, nil
 }
 
@@ -153,9 +153,19 @@ func (c *ClockHand) Run() {
 // shim between the hand and the stepper so that the motor can be
 // turned off between movements.
 func (c *ClockHand) Move(steps int) {
-	if c.stepper != nil {
-		c.stepper.Step(c.Config.Speed, steps)
-		c.stepper.Off() // Turn stepper off between moves
+	if c.Stepper != nil {
+		c.Stepper.Step(c.Config.Speed, steps)
+		c.Stepper.Off() // Turn stepper off between moves
+	}
+}
+
+// Close shutdowns the clock hand
+func (c *ClockHand) Close() {
+	if c.Stepper != nil {
+		c.Stepper.Close()
+	}
+	if c.Input != nil {
+		c.Input.Close()
 	}
 }
 
@@ -173,7 +183,10 @@ func Calibrate(run bool, e *Encoder, h *Hand, reference, initial int) {
 	// Move to encoder reference position.
 	loc := e.getStep.GetStep()
 	log.Printf("%s: Calibration complete (%d steps), moving to midpoint (%d)", h.Name, e.Measured, e.Midpoint)
-	steps := e.Midpoint - int(loc % int64(e.Measured))
+	steps := e.Midpoint - int(loc%int64(e.Measured))
+	if steps < 0 {
+		steps += e.Measured
+	}
 	h.mover.Move(steps)
 	// The hand is at the midpoint of the encoder, so the hand is
 	// at a known physical location, which is set as the initial position.

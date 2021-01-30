@@ -45,15 +45,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("ClockHand: %s %v", *section, err)
 	}
+	defer clk.Close()
 	hand.Calibrate(false, clk.Encoder, clk.Hand, clk.Config.Steps, clk.Config.Initial)
 	reader := bufio.NewReader(os.Stdin)
+	st := clk.Stepper
+	enc := clk.Encoder
+	var steps int
 	for {
+		at := int(st.GetStep() % int64(enc.Measured))
+		fmt.Printf("Absolute: %d, relative %d (size %d), midpoint %d (offset %d)\n", st.GetStep(), at, enc.Measured, enc.Midpoint, diff(at, enc.Midpoint, enc.Measured))
 		fmt.Print("Enter steps or command ('help' for help) ")
 		text, _ := reader.ReadString('\n')
 		text = strings.TrimSuffix(text, "\n")
 		switch text {
 		case "help":
-			fmt.Println("Enter signed number of steps, or:")
 			fmt.Println("  help - print help")
 			fmt.Println("  [-]NNN move steps")
 			fmt.Println("  m - move to encoder midpoint")
@@ -61,13 +66,27 @@ func main() {
 		case "q":
 			return
 		case "m":
-			fmt.Printf("Move to midpoint\n")
+			fmt.Printf("Move to midpoint (%d) from %d\n", enc.Midpoint, st.GetStep())
+			steps = diff(int(st.GetStep()), enc.Midpoint, enc.Measured)
+			clk.Move(steps)
 		default:
-			var steps int
 			n, err := fmt.Sscanf(text, "%d", &steps)
 			if err != nil || n != 1 {
 				fmt.Printf("Unrecognised input\n")
+			} else {
+				fmt.Printf("Moving %d steps\n", steps)
+				clk.Move(steps)
 			}
 		}
 	}
+}
+
+func diff(a, b, o int) int {
+	a %= o
+	b %= o
+	d := b - a
+	if d < 0 {
+		d += o
+	}
+	return d
 }

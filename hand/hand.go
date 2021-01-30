@@ -93,13 +93,17 @@ func (h *Hand) Run() {
 }
 
 // Set the hand to the target position.
+// Always move clockwise, to avoid encoder getting confused.
 func (h *Hand) set(target int) {
 	st := 0
 	if target == 0 {
-		st += h.adjusted - h.Current
+		st = h.adjusted - h.Current
 		h.Current = 0
 	} else {
-		st += target - h.Current
+		st = target - h.Current
+		if st < 0 {
+			st += h.adjusted
+		}
 		h.Current += st
 	}
 	h.mover.Move(st)
