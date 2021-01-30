@@ -46,14 +46,12 @@ func main() {
 		log.Fatalf("ClockHand: %s %v", *section, err)
 	}
 	defer clk.Close()
-	hand.Calibrate(false, clk.Encoder, clk.Hand, clk.Config.Steps, clk.Config.Initial)
+	hand.Calibrate(false, clk.Encoder, clk.Hand, clk.Config.Steps)
 	reader := bufio.NewReader(os.Stdin)
-	st := clk.Stepper
 	enc := clk.Encoder
 	var steps int
 	for {
-		at := int(st.GetStep() % int64(enc.Measured))
-		fmt.Printf("Absolute: %d, relative %d (size %d), midpoint %d (offset %d)\n", st.GetStep(), at, enc.Measured, enc.Midpoint, diff(at, enc.Midpoint, enc.Measured))
+		fmt.Printf("Location %d (size %d), encoder mark offset %d\n", enc.Location(), enc.Measured, diff(enc.Location(), 0, enc.Measured))
 		fmt.Print("Enter steps or command ('help' for help) ")
 		text, _ := reader.ReadString('\n')
 		text = strings.TrimSuffix(text, "\n")
@@ -61,17 +59,22 @@ func main() {
 		case "help":
 			fmt.Println("  help - print help")
 			fmt.Println("  [-]NNN move steps")
-			fmt.Println("  m - move to encoder midpoint")
+			fmt.Println("  m - move to encoder mark")
+			fmt.Println("  o - move to configured offset")
 			fmt.Println("  q - quit")
 		case "q":
 			return
 		case "m":
-			fmt.Printf("Move to midpoint (%d) from %d\n", enc.Midpoint, st.GetStep())
-			steps = diff(int(st.GetStep()), enc.Midpoint, enc.Measured)
+			fmt.Printf("Move to encoder mark from %d\n", enc.Location())
+			steps = enc.Measured - enc.Location()
+			clk.Move(steps)
+		case "o":
+			fmt.Printf("Move to offset (%d) from %d\n", hc.Initial, enc.Location())
+			steps = diff(enc.Location(), hc.Initial, enc.Measured)
 			clk.Move(steps)
 		default:
 			n, err := fmt.Sscanf(text, "%d", &steps)
-			if err != nil || n != 1 {
+			if err != nil || n != 1 || steps <= 0 {
 				fmt.Printf("Unrecognised input\n")
 			} else {
 				fmt.Printf("Moving %d steps\n", steps)

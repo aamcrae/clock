@@ -141,12 +141,12 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		c.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(c.Stepper, c.Hand, c.Input, hc.Notch)
+	c.Encoder = NewEncoder(c.Stepper, c.Hand, c.Input, hc.Notch, hc.Initial)
 	return c, nil
 }
 
 func (c *ClockHand) Run() {
-	Calibrate(true, c.Encoder, c.Hand, c.Config.Steps, c.Config.Initial)
+	Calibrate(true, c.Encoder, c.Hand, c.Config.Steps)
 }
 
 // Move moves the stepper motor the steps indicated. This is a
@@ -174,23 +174,18 @@ func (c *ClockHand) Close() {
 // for 360 degrees of movement.
 // Once that is known, the hand is moved to the midpoint of the encoder,
 // and this is considered the initial location for the hand.
-func Calibrate(run bool, e *Encoder, h *Hand, reference, initial int) {
+func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	log.Printf("%s: Starting calibration", h.Name)
 	h.mover.Move(int(reference*2 + reference/2))
 	if e.Measured == 0 {
 		log.Fatalf("Unable to calibrate")
 	}
 	// Move to encoder reference position.
-	loc := e.getStep.GetStep()
-	log.Printf("%s: Calibration complete (%d steps), moving to midpoint (%d)", h.Name, e.Measured, e.Midpoint)
-	steps := e.Midpoint - int(loc%int64(e.Measured))
-	if steps < 0 {
-		steps += e.Measured
-	}
+	loc := e.Location()
+	steps := e.Measured - loc
+	log.Printf("%s: Calibration complete (%d steps), moving to encoder mark (%d steps)", h.Name, e.Measured, steps)
 	h.mover.Move(steps)
-	// The hand is at the midpoint of the encoder, so the hand is
-	// at a known physical location, which is set as the initial position.
-	h.Current = initial
+	log.Printf("%s: Ready to start hand", h.Name)
 	if run {
 		h.Run()
 	}

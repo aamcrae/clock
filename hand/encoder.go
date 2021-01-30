@@ -28,7 +28,7 @@ type GetStep interface {
 // Adjuster provides an interface to update the measured number of steps
 // in a revolution of a hand.
 type Adjuster interface {
-	Adjust(int)
+	Adjust(int, int)
 }
 
 // IO provides a method to return when an input changes.
@@ -49,26 +49,33 @@ type Encoder struct {
 	Invert   bool  // Invert input signal
 	Measured int   // Measured steps per revolution
 	size     int64 // Minimum span of sensor mark
-	Midpoint int   // Midpoint of sensor.
+	offset   int64 // Offset for encoder
+	lastEdge int64 // Last location of encoder mark
 }
 
 // NewEncoder creates a new Encoder structure
-func NewEncoder(stepper GetStep, adj Adjuster, io IO, size int) *Encoder {
+func NewEncoder(stepper GetStep, adj Adjuster, io IO, size, offset int) *Encoder {
 	e := new(Encoder)
 	e.getStep = stepper
 	e.adjust = adj
 	e.enc = io
 	e.size = int64(size)
+	e.offset = int64(offset)
 	go e.driver()
 	return e
 }
 
+// Location returns the current location as an offset from
+// the encoder mark
+func (e *Encoder) Location() int {
+	return int(e.getStep.GetStep() + e.offset - e.lastEdge)
+}
+
 // driver is the main goroutine for servicing the encoder.
 func (e *Encoder) driver() {
-	last := int64(0)
-	lastEdge := int64(-1)
+	last := int64(e.offset)
+	e.lastEdge = int64(-1)
 	lastMeasured := 0
-	start := int64(-1)
 	for {
 		// Retrieve the sensor value when it changes.
 		s, err := e.enc.Get()
@@ -78,38 +85,32 @@ func (e *Encoder) driver() {
 		if e.Invert {
 			s = s ^ 1
 		}
-		// Retrieve the current location.
-		loc := e.getStep.GetStep()
+		// Retrieve the current absolute location.
+		loc := e.getStep.GetStep() + e.offset
 		// Check for debounce
 		d := diff(loc, last)
 		last = loc
 		if debounce != 0 && d < debounce {
 			continue
 		}
-		// If transitioning from 0 to 1, remember this location as
-		// the starting location of the encoder mark
-		if s == 1 {
-			start = loc
-		} else if d >= e.size {
-			// Transitioned from 1 to 0, and the signal is large
-			// enough to be considered as the real encoder mark.
-			if lastEdge > 0 {
+		// Transitioned from 1 to 0, and the signal is large
+		// enough to be considered as the real encoder mark.
+		if s == 0 && d >= e.size {
+			if e.lastEdge > 0 {
 				// If the last sensor edge is known,
 				// calculate the difference between the current
 				// edge and the previous.
 				// This is the measured number of steps in a revolution.
-				e.Measured = int(diff(lastEdge, loc))
-				// Determine the midpoint of the encoder mark.
-				e.Midpoint = int((loc-start)/2+start) % e.Measured
+				e.Measured = int(diff(e.lastEdge, loc))
 				if lastMeasured != e.Measured {
 					// If the number of steps in a revolution has
 					// changed, update the interested party.
 					log.Printf("Adjust to %d (%d)", e.Measured, e.Measured-lastMeasured)
-					e.adjust.Adjust(e.Measured)
+					e.adjust.Adjust(e.Measured, int(e.offset))
 					lastMeasured = e.Measured
 				}
 			}
-			lastEdge = loc
+			e.lastEdge = loc
 		}
 	}
 }

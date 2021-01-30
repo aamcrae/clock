@@ -59,6 +59,7 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.divisor = int(update.Milliseconds())
 	h.reference = steps
 	h.actual = steps // Initial reference value
+	h.Current = 0
 	fmt.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
 	return h
 }
@@ -71,16 +72,15 @@ func (h *Hand) Position() (int, int) {
 	return h.Current, h.actual
 }
 
-// Adjust sets an updated steps per revolution.
+// Adjust sets an updated steps per revolution and resets the current location.
 // An adjustment usually is derived from a sensor tracking the actual
-// movememnt of the hand.
-func (h *Hand) Adjust(adj int) {
+// movemment of the hand.
+func (h *Hand) Adjust(adj int, location int) {
 	h.Adjusted++
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.actual = adj
-	// Current location may need wrapping.
-	h.Current %= adj
+	h.Current = location
 }
 
 // Run starts the processing of the hand.
@@ -107,18 +107,15 @@ func (h *Hand) Run() {
 func (h *Hand) set(target int) {
 	st := 0
 	h.mu.Lock()
-	if target == 0 {
-		st = h.actual - h.Current
-		h.Current = 0
-	} else {
-		st = target - h.Current
-		if st < 0 {
-			st += h.actual
-		}
-		h.Current = (st + h.Current) % h.actual
+	st = target - h.Current
+	if st < 0 {
+		st += h.actual
 	}
+	h.Current = (st + h.Current) % h.actual
 	h.mu.Unlock()
-	h.mover.Move(st)
+	if st > 0 {
+		h.mover.Move(st)
+	}
 }
 
 // Calculate and determine the target position of the hand
