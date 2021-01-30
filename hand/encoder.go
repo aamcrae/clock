@@ -104,7 +104,7 @@ func (e *Encoder) driver() {
 				if lastMeasured != e.Measured {
 					// If the number of steps in a revolution has
 					// changed, update the interested party.
-					log.Printf("Adjust to %d (old %d)", e.Measured, lastMeasured)
+					log.Printf("Adjust to %d (%d)", e.Measured, e.Measured-lastMeasured)
 					e.adjust.Adjust(e.Measured)
 					lastMeasured = e.Measured
 				}

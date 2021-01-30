@@ -18,6 +18,7 @@ package hand
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -30,20 +31,22 @@ type MoveHand interface {
 // is represented by the number of ticks. Updating the clock
 // moves the hand by one tick each time.
 // Moving is done by sending a +/- step count to a mover.
-// The number of steps in a single revolution is held in adjusted,
+// The number of steps in a single revolution is held in actual,
 // which is initially set from a reference value, and can be
 // updated by an external encoder tracking the actual physical
 // movement of the hand.
 type Hand struct {
-	Name     string
-	Ticking  bool
-	Current  int // Current hand position
-	mover    MoveHand
-	interval time.Duration
-	ticks    int // Number of segments in clock face
-	steps    int // Reference steps per clock revolution
-	adjusted int // Measured steps per revolution
-	divisor  int // Used to calculate ticks
+	Name      string
+	Ticking   bool
+	Current   int // Current hand position
+	Adjusted  int // Number of times adjustment has been made
+	mover     MoveHand
+	interval  time.Duration
+	ticks     int        // Number of segments in clock face
+	reference int        // Reference steps per clock revolution
+	actual    int        // Measured steps per revolution
+	divisor   int        // Used to calculate ticks
+	mu        sync.Mutex // Guards Current and actual
 }
 
 // NewHand creates and initialises a Hand structure.
@@ -54,23 +57,30 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.interval = update
 	h.ticks = int(unit / update)
 	h.divisor = int(update.Milliseconds())
-	h.steps = steps
-	h.adjusted = steps
-	fmt.Printf("%s: ticks %d, steps %d, divisor %d\n", h.Name, h.ticks, h.steps, h.divisor)
+	h.reference = steps
+	h.actual = steps // Initial reference value
+	fmt.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
 	return h
 }
 
 // Position returns the current hand position as well as the
 // number of steps in a revolution.
 func (h *Hand) Position() (int, int) {
-	return h.Current, h.adjusted
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.Current, h.actual
 }
 
 // Adjust sets an updated steps per revolution.
 // An adjustment usually is derived from a sensor tracking the actual
 // movememnt of the hand.
 func (h *Hand) Adjust(adj int) {
-	h.adjusted = adj
+	h.Adjusted++
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.actual = adj
+	// Current location may need wrapping.
+	h.Current %= adj
 }
 
 // Run starts the processing of the hand.
@@ -96,16 +106,18 @@ func (h *Hand) Run() {
 // Always move clockwise, to avoid encoder getting confused.
 func (h *Hand) set(target int) {
 	st := 0
+	h.mu.Lock()
 	if target == 0 {
-		st = h.adjusted - h.Current
+		st = h.actual - h.Current
 		h.Current = 0
 	} else {
 		st = target - h.Current
 		if st < 0 {
-			st += h.adjusted
+			st += h.actual
 		}
-		h.Current += st
+		h.Current = (st + h.Current) % h.actual
 	}
+	h.mu.Unlock()
 	h.mover.Move(st)
 }
 
@@ -122,7 +134,7 @@ func (h *Hand) target(t time.Time) int {
 	mod := (target / h.divisor)
 	mt := mod % h.ticks
 	// Round up.
-	return (mt*h.adjusted + h.ticks/2) / h.ticks
+	return (mt*h.actual + h.ticks/2) / h.ticks
 }
 
 // Sync time to the boundary of the update interval so that the
