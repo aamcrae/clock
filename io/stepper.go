@@ -21,11 +21,6 @@ import (
 
 const stepperQueueSize = 20 // Size of queue for requests
 
-// Setter is an interface for setting an output value on a GPIO
-type Setter interface {
-	Set(int) error
-}
-
 type msg struct {
 	speed float64 // RPM
 	steps int
@@ -39,13 +34,13 @@ type msg struct {
 // 0 when the stepper is first initialised. This can be a negative or positive number,
 // depending on the movement.
 type Stepper struct {
-	pin1, pin2, pin3, pin4 Setter
-	factor                 float64
-	mChan                  chan msg
-	stopChan               chan bool
-	index                  int   // Index to step sequence
-	on                     bool  // true if motor drivers on
-	current                int64 // Current step number as an absolute number
+	pin1, pin2, pin3, pin4 Setter    // Pins for controlling outputs
+	factor                 float64   // Number of steps per revolution.
+	mChan                  chan msg  // channel for message requests
+	stopChan               chan bool // channel for signalling resets.
+	index                  int       // Index to step sequence
+	on                     bool      // true if motor drivers on
+	current                int64     // Current step number as an absolute number
 }
 
 // Half step sequence of outputs.
@@ -60,7 +55,8 @@ var sequence = [][]int{
 	[]int{1, 0, 0, 1},
 }
 
-// NewStepper creates and initialises a Stepper struct.
+// NewStepper creates and initialises a Stepper struct, representing
+// a stepper motor controlled by 4 GPIO pins.
 // rev is the number of steps per revolution as a reference value for
 // determining the delays between steps.
 func NewStepper(rev int, pin1, pin2, pin3, pin4 Setter) *Stepper {

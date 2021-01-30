@@ -25,13 +25,19 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Setter is an interface for setting an output value on a GPIO
+type Setter interface {
+	Set(int) error
+}
+
 const verifyTimeout = 2 * time.Second
 
-// Verify will wait for exported files to become writable.
+// Verify will enable waiting for exported files to become writable.
 // This is necessary if the process is not running as root - systemd
 // and udev will change the group permissions on the exported files, but
 // this takes some time to do. If we try and access the files before
 // the file group/modes are changed, we will get a permission error.
+// This can be overridden.
 var Verify = false
 
 func init() {
@@ -42,10 +48,14 @@ func init() {
 	}
 }
 
+// unexport writes a unit number to an unexport file.
 func unexport(f string, g int) error {
 	return writeFile(f, fmt.Sprintf("%d", g))
 }
 
+// export will check for the existence of a file, and if it is
+// not writable, will write a unit number to an export file, and then
+// optionally wait for the file to appear and become writable.
 func export(f, expfile string, g int) error {
 	// Check if directory and files already exist.
 	err := unix.Access(f, unix.W_OK|unix.R_OK)
@@ -59,6 +69,7 @@ func export(f, expfile string, g int) error {
 	return err
 }
 
+// Write a string to a file.
 func writeFile(fname, s string) error {
 	f, err := os.OpenFile(fname, os.O_WRONLY, 0600)
 	if err != nil {
@@ -69,7 +80,7 @@ func writeFile(fname, s string) error {
 	return err
 }
 
-// Wait for file to become writable
+// Wait for file to become writable.
 func verifyFile(f string) error {
 	var tout time.Duration
 	sl := time.Millisecond
