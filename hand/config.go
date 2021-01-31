@@ -19,8 +19,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/aamcrae/clock/io"
 	"github.com/aamcrae/config"
+	"github.com/aamcrae/gpio"
 )
 
 // Configuration data for the clock hand, read from a configuration file.

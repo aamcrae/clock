@@ -4,11 +4,6 @@
 *.dll
 *.so
 *.dylib
-example/step
-example/step2
-example/watch
-example/pwm
-example/example
 simulator/simulator
 utils/utils
 utils/calibrate
