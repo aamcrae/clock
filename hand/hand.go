@@ -17,7 +17,7 @@
 package hand
 
 import (
-	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -62,7 +62,7 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.reference = steps
 	h.actual = steps // Initial reference value
 	h.Current = 0
-	fmt.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
+	log.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
 	return h
 }
 
@@ -116,6 +116,7 @@ func (h *Hand) set(target int) {
 	h.mu.Lock()
 	st = target - h.Current
 	if st < 0 {
+		log.Printf("%s: Fast foward (%d steps)", h.Name, st)
 		st += h.actual
 	}
 	h.Current = (st + h.Current) % h.actual
