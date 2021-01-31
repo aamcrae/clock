@@ -116,7 +116,7 @@ func (h *Hand) set(target int) {
 	h.mu.Lock()
 	st = target - h.Current
 	if st < 0 {
-		log.Printf("%s: Fast foward (%d steps)", h.Name, st)
+		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
 		st += h.actual
 	}
 	h.Current = (st + h.Current) % h.actual
