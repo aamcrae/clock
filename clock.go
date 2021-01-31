@@ -49,6 +49,9 @@ func main() {
 	for _, c := range clock {
 		go c.Run()
 	}
+	if len(clock) == 0 {
+		log.Fatalf("No clock hands to run!")
+	}
 	if *port != 0 {
 		var hands []*hand.Hand
 		for _, c := range clock {
