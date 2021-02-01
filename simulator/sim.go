@@ -119,7 +119,7 @@ func sim(index int) *SimHand {
 	sh.edge1 = p.edge1
 	sh.edge2 = p.edge2
 	sh.hand = hand.NewHand(p.name, p.period, sh, p.update, p.reference)
-	sh.encoder = hand.NewEncoder(sh, sh.hand, sh, (p.edge2-p.edge1+1)/2, 0)
+	sh.encoder = hand.NewEncoder(p.name, sh, sh.hand, sh, (p.edge2-p.edge1+1)/2, 0)
 	go hand.Calibrate(true, sh.encoder, sh.hand, p.reference)
 	return sh
 }

@@ -51,6 +51,7 @@ const debounce = 5
 // physical clock hand e.g when the hand is at the encoder mark, the hand
 // may be pointing to a location N steps away from the top of the clock face.
 type Encoder struct {
+	Name	 string
 	getStep  GetStep
 	adjust   Adjuster
 	enc      IO    // I/O from encoder hardware
@@ -62,8 +63,9 @@ type Encoder struct {
 }
 
 // NewEncoder creates a new Encoder structure.
-func NewEncoder(stepper GetStep, adj Adjuster, io IO, size, offset int) *Encoder {
+func NewEncoder(name string, stepper GetStep, adj Adjuster, io IO, size, offset int) *Encoder {
 	e := new(Encoder)
+	e.Name = name
 	e.getStep = stepper
 	e.adjust = adj
 	e.enc = io
@@ -92,7 +94,7 @@ func (e *Encoder) driver() {
 		// Retrieve the sensor value when it changes.
 		s, err := e.enc.Get()
 		if err != nil {
-			log.Fatalf("Encoder input: %v", err)
+			log.Fatalf("%s: Encoder input: %v", e.Name, err)
 		}
 		if e.Invert {
 			s = s ^ 1
@@ -118,12 +120,12 @@ func (e *Encoder) driver() {
 					// Check it is within the maximum allowed range
 					b := lastMeasured * adjustBound / 100
 					if lastMeasured != 0 && (newM < (lastMeasured - b) || ((lastMeasured + b) < newM)) {
-						log.Printf("Adjustment out of range: %d (old %d)", newM, lastMeasured)
+						log.Printf("%s: Adjustment out of range: %d (old %d)", e.Name, newM, lastMeasured)
 					} else {
 						e.Measured = newM
 						// If the number of steps in a revolution has
 						// changed, update the interested party.
-						log.Printf("Adjust to %d (%d)", e.Measured, e.Measured-lastMeasured)
+						log.Printf("%s: Adjust to %d (%d)", e.Name, e.Measured, e.Measured-lastMeasured)
 						e.adjust.Adjust(newM, int(e.offset))
 						lastMeasured = newM
 					}

@@ -148,7 +148,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		c.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(c.Stepper, c.Hand, c.Input, hc.Notch, hc.Offset)
+	c.Encoder = NewEncoder(hc.Name, c.Stepper, c.Hand, c.Input, hc.Notch, hc.Offset)
 	return c, nil
 }
 
