@@ -48,6 +48,7 @@ type Hand struct {
 	reference int           // Reference steps per clock revolution
 	actual    int           // Measured steps per revolution
 	divisor   int           // Used to calculate ticks
+	skipMove  int           // Minimum amount required to fast forward
 	mu        sync.Mutex    // Guards Current and actual
 }
 
@@ -62,6 +63,7 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.reference = steps
 	h.actual = steps // Initial reference value
 	h.Current = 0
+	h.skipMove = steps * 2 / h.ticks // at least 2 ticks to fast forward
 	log.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
 	return h
 }
@@ -107,23 +109,36 @@ func (h *Hand) Run() {
 
 // Set the hand to the target position.
 // Always move clockwise, to avoid encoder getting confused.
-// TODO: Potentially a small negative movement could arise if the
-// steps per revolution change. It is likely better to simply skip moving the
-// hand to let the adjusted time catch up; the alternative is to fast-forward
-// the hand to the target point.
 func (h *Hand) set(target int) {
-	st := 0
-	h.mu.Lock()
-	st = target - h.Current
-	if st < 0 {
-		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
-		st += h.actual
-	}
-	h.Current = (st + h.Current) % h.actual
-	h.mu.Unlock()
+	st := h.steps(target)
 	if st > 0 {
 		h.mover.Move(st)
 	}
+}
+
+// steps returns the number of steps to move.
+// A small negative movement can arise if the steps per revolution change.
+// It is likely better to simply skip moving the hand to let the adjusted
+// time catch up; the alternative is to fast-forward the hand to the target point.
+func (h *Hand) steps(target int) int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	// Get difference between target and current location.
+	st := target - h.Current
+	if st < 0 {
+		if -st < h.skipMove {
+			log.Printf("%s: Skipping move (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
+			return 0
+		}
+		// Convert backwards move to forward move around the clock.
+		st += h.actual
+	}
+	if st > h.skipMove {
+		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
+	}
+	// Adjust the current location.
+	h.Current = (st + h.Current) % h.actual
+	return st
 }
 
 // Calculate and determine the target step position of the hand

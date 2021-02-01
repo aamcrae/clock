@@ -20,6 +20,9 @@ import (
 	"log"
 )
 
+// Percentage range for sanity checking new adjustment value.
+const adjustBound = 10
+
 // GetStep provides a method to read the absolute location of the stepper motor.
 type GetStep interface {
 	GetStep() int64
@@ -110,13 +113,20 @@ func (e *Encoder) driver() {
 				// calculate the difference between the current
 				// mark and the previous mark.
 				// This is the measured number of steps in a revolution.
-				e.Measured = int(diff(e.lastEdge, loc))
-				if lastMeasured != e.Measured {
-					// If the number of steps in a revolution has
-					// changed, update the interested party.
-					log.Printf("Adjust to %d (%d)", e.Measured, e.Measured-lastMeasured)
-					e.adjust.Adjust(e.Measured, int(e.offset))
-					lastMeasured = e.Measured
+				newM := int(diff(e.lastEdge, loc))
+				if lastMeasured != newM {
+					// Check it is within the maximum allowed range
+					b := lastMeasured * adjustBound / 100
+					if lastMeasured != 0 && (newM < (lastMeasured - b) || ((lastMeasured + b) < newM)) {
+						log.Printf("Adjustment out of range: %d (old %d)", newM, lastMeasured)
+					} else {
+						e.Measured = newM
+						// If the number of steps in a revolution has
+						// changed, update the interested party.
+						log.Printf("Adjust to %d (%d)", e.Measured, e.Measured-lastMeasured)
+						e.adjust.Adjust(newM, int(e.offset))
+						lastMeasured = newM
+					}
 				}
 			}
 			e.lastEdge = loc
