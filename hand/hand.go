@@ -63,7 +63,7 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.reference = steps
 	h.actual = steps // Initial reference value
 	h.Current = 0
-	h.skipMove = steps * 2 / h.ticks // at least 2 ticks to fast forward
+	h.skipMove = steps / 100
 	log.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
 	return h
 }
