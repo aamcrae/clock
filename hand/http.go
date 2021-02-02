@@ -112,7 +112,7 @@ func status(clock []*Hand) func(http.ResponseWriter, *http.Request) {
 		for _, h := range clock {
 			fmt.Fprintf(w, "%s: ", h.Name)
 			p, r := h.Position()
-			fmt.Fprintf(w, "position: %d face size: %d (adjusted %d times)<br>", p, r, h.Adjusted)
+			fmt.Fprintf(w, "position: %d face size: %d (adjustments: %d, skipped: %d, fast-forwards %d)<br>", p, r, h.Adjusted, h.Skipped, h.FastForward)
 		}
 		fmt.Fprintf(w, "<p><a href=\"clock.jpg\">clock face</a><br>")
 		fmt.Fprintf(w, "</body>")

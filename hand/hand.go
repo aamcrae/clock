@@ -41,7 +41,6 @@ type Hand struct {
 	Name      string        // Name of this hand
 	Ticking   bool          // True if the clock has completed initialisation and is ticking.
 	Current   int           // Current hand position
-	Adjusted  int           // Number of times adjustment has been made
 	mover     MoveHand      // Mover to move the hand
 	update    time.Duration // Update interval
 	ticks     int           // Number of segments in clock face
@@ -50,6 +49,9 @@ type Hand struct {
 	divisor   int           // Used to calculate ticks
 	skipMove  int           // Minimum amount required to fast forward
 	mu        sync.Mutex    // Guards Current and actual
+	Adjusted  int           // Number of times adjustment has been made
+	Skipped   int			// Number of skipped moves
+	FastForward int			// Number of fast forward movements
 }
 
 // NewHand creates and initialises a Hand structure.
@@ -84,6 +86,7 @@ func (h *Hand) Adjust(adj int, location int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.actual = adj
+	// Reset the current location.
 	h.Current = location
 }
 
@@ -127,6 +130,7 @@ func (h *Hand) steps(target int) int {
 	st := target - h.Current
 	if st < 0 {
 		if -st < h.skipMove {
+			h.Skipped++
 			log.Printf("%s: Skipping move (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
 			return 0
 		}
@@ -134,9 +138,10 @@ func (h *Hand) steps(target int) int {
 		st += h.actual
 	}
 	if st > h.skipMove {
+		h.FastForward++
 		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
 	}
-	// Adjust the current location.
+	// Update the current location to where the hand will be after the movement.
 	h.Current = (st + h.Current) % h.actual
 	return st
 }
