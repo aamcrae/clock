@@ -28,10 +28,10 @@ type GetStep interface {
 	GetStep() int64
 }
 
-// Adjuster provides an interface to update the measured number of steps
+// Syncer provides an interface to update the measured number of steps
 // in a revolution of a hand.
-type Adjuster interface {
-	Adjust(int, int)
+type Syncer interface {
+	Resync(int, int)
 }
 
 // IO provides a method to return when an input changes.
@@ -53,7 +53,7 @@ const debounce = 5
 type Encoder struct {
 	Name	 string
 	getStep  GetStep
-	adjust   Adjuster
+	syncer   Syncer
 	enc      IO    // I/O from encoder hardware
 	Invert   bool  // Invert input signal
 	Measured int   // Measured steps per revolution
@@ -63,11 +63,11 @@ type Encoder struct {
 }
 
 // NewEncoder creates a new Encoder structure.
-func NewEncoder(name string, stepper GetStep, adj Adjuster, io IO, size, offset int) *Encoder {
+func NewEncoder(name string, stepper GetStep, syncer Syncer, io IO, size, offset int) *Encoder {
 	e := new(Encoder)
 	e.Name = name
 	e.getStep = stepper
-	e.adjust = adj
+	e.syncer = syncer
 	e.enc = io
 	e.size = int64(size)
 	e.offset = int64(offset)
@@ -120,13 +120,13 @@ func (e *Encoder) driver() {
 					// Check it is within the maximum allowed range
 					b := lastMeasured * adjustBound / 100
 					if lastMeasured != 0 && (newM < (lastMeasured - b) || ((lastMeasured + b) < newM)) {
-						log.Printf("%s: Adjustment out of range: %d (old %d)", e.Name, newM, lastMeasured)
+						log.Printf("%s: Resync out of range: %d (old %d)", e.Name, newM, lastMeasured)
 					} else {
 						e.Measured = newM
 						// If the number of steps in a revolution has
 						// changed, update the interested party.
-						log.Printf("%s: Adjust to %d (%d)", e.Name, e.Measured, e.Measured-lastMeasured)
-						e.adjust.Adjust(newM, int(e.offset))
+						log.Printf("%s: Resync to %d (%d)", e.Name, e.Measured, e.Measured-lastMeasured)
+						e.syncer.Resync(newM, int(e.offset))
 						lastMeasured = newM
 					}
 				}

@@ -49,7 +49,7 @@ type Hand struct {
 	divisor   int           // Used to calculate ticks
 	skipMove  int           // Minimum amount required to fast forward
 	mu        sync.Mutex    // Guards Current and actual
-	Adjusted  int           // Number of times adjustment has been made
+	Resyncs  int            // Number of times resynced
 	Skipped   int			// Number of skipped moves
 	FastForward int			// Number of fast forward movements
 }
@@ -78,11 +78,11 @@ func (h *Hand) Position() (int, int) {
 	return h.Current, h.actual
 }
 
-// Adjust updates the steps per revolution and sets the current location.
+// Resync updates the steps per revolution and sets the current location.
 // An adjustment usually is derived from a sensor tracking the physical
 // movement of the hand.
-func (h *Hand) Adjust(adj int, location int) {
-	h.Adjusted++
+func (h *Hand) Resync(adj int, location int) {
+	h.Resyncs++
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.actual = adj

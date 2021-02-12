@@ -165,7 +165,9 @@ func (c *ClockHand) Run() {
 func (c *ClockHand) Move(steps int) {
 	if c.Stepper != nil {
 		c.Stepper.Step(c.Config.Speed, steps)
-		c.Stepper.Off() // Turn stepper off between moves
+		c.Stepper.Wait()
+		//time.Sleep(50*time.Millisecond)
+		//c.Stepper.Off() // Turn stepper off between moves
 	}
 }
 
@@ -179,7 +181,7 @@ func (c *ClockHand) Close() {
 	}
 }
 
-// Calibrate moves the hand at least 2 1/2 revolutions to allow
+// Calibrate moves the hand at least 4 revolutions to allow
 // the encoder to measure the actual steps for 360 degrees of movement.
 // Once that is known, the hand is moved to the encoder mark,
 // and this is considered the initial location for the hand.
@@ -187,7 +189,7 @@ func (c *ClockHand) Close() {
 // hand when the encoder is at the mark.
 func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	log.Printf("%s: Starting calibration", h.Name)
-	h.mover.Move(int(reference*2 + reference/2))
+	h.mover.Move(int(reference*4 + reference/2))
 	if e.Measured == 0 {
 		log.Fatalf("Unable to calibrate")
 	}
