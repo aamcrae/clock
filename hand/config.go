@@ -137,7 +137,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		}
 	}
 	c.Stepper = io.NewStepper(hc.Steps, gp[0], gp[1], gp[2], gp[3])
-	c.Hand = NewHand(hc.Name, hc.Period, c, hc.Update, int(hc.Steps))
+	c.Hand = NewHand(hc.Name, hc.Period, c, hc.Update, int(hc.Steps), hc.Offset)
 	c.Input, err = io.Pin(hc.Encoder)
 	if err != nil {
 		c.Close()
@@ -148,7 +148,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 		c.Close()
 		return nil, fmt.Errorf("Encoder %d: %v", hc.Encoder, err)
 	}
-	c.Encoder = NewEncoder(hc.Name, c.Stepper, c.Hand, c.Input, hc.Notch, hc.Offset)
+	c.Encoder = NewEncoder(hc.Name, c.Stepper, c.Hand, c.Input, hc.Notch)
 	return c, nil
 }
 
@@ -185,8 +185,6 @@ func (c *ClockHand) Close() {
 // the encoder to measure the actual steps for 360 degrees of movement.
 // Once that is known, the hand is moved to the encoder mark,
 // and this is considered the initial location for the hand.
-// An offset may be applied that indicates the physical location of the
-// hand when the encoder is at the mark.
 func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	log.Printf("%s: Starting calibration", h.Name)
 	h.mover.Move(int(reference*4 + reference/2))

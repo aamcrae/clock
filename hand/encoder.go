@@ -31,7 +31,7 @@ type GetStep interface {
 // Syncer provides an interface to update the measured number of steps
 // in a revolution of a hand.
 type Syncer interface {
-	Resync(int, int)
+	Resync(int)
 }
 
 // IO provides a method to return when an input changes.
@@ -45,11 +45,6 @@ const debounce = 5
 // The count of current step values is used to track the
 // number of steps in a rotation between encoder signals, and
 // this is used to calculate the actual number of steps in a revolution.
-// An offset may be provided that correlates the encoder mark reference point
-// and the actual physical location of the hand - when the hand is at the
-// encoder reference point, the offset represents the relative offset of the
-// physical clock hand e.g when the hand is at the encoder mark, the hand
-// may be pointing to a location N steps away from the top of the clock face.
 type Encoder struct {
 	Name	 string
 	getStep  GetStep
@@ -58,26 +53,24 @@ type Encoder struct {
 	Invert   bool  // Invert input signal
 	Measured int   // Measured steps per revolution
 	size     int64 // Minimum span of sensor mark
-	offset   int64 // Offset from encoder mark
 	lastEdge int64 // Last location of encoder mark
 }
 
 // NewEncoder creates a new Encoder structure.
-func NewEncoder(name string, stepper GetStep, syncer Syncer, io IO, size, offset int) *Encoder {
+func NewEncoder(name string, stepper GetStep, syncer Syncer, io IO, size int) *Encoder {
 	e := new(Encoder)
 	e.Name = name
 	e.getStep = stepper
 	e.syncer = syncer
 	e.enc = io
 	e.size = int64(size)
-	e.offset = int64(offset)
 	go e.driver()
 	return e
 }
 
 // Location returns the current location as a relative position from the encoder mark
 func (e *Encoder) Location() int {
-	return int(e.getStep.GetStep() + e.offset - e.lastEdge)
+	return int(e.getStep.GetStep() - e.lastEdge)
 }
 
 // driver is the main goroutine for servicing the encoder.
@@ -87,7 +80,7 @@ func (e *Encoder) Location() int {
 // The 1->0 transition is considered the reference point for measuring the
 // number of steps in a revolution.
 func (e *Encoder) driver() {
-	last := int64(e.offset)
+	last := int64(0)
 	e.lastEdge = int64(-1)
 	lastMeasured := 0
 	for {
@@ -99,8 +92,8 @@ func (e *Encoder) driver() {
 		if e.Invert {
 			s = s ^ 1
 		}
-		// Retrieve the current absolute location (offset included).
-		loc := e.getStep.GetStep() + e.offset
+		// Retrieve the current absolute location.
+		loc := e.getStep.GetStep()
 		// Check for debounce, and discard if noisy.
 		d := diff(loc, last)
 		last = loc
@@ -126,7 +119,7 @@ func (e *Encoder) driver() {
 						// If the number of steps in a revolution has
 						// changed, update the interested party.
 						log.Printf("%s: Resync to %d (%d)", e.Name, e.Measured, e.Measured-lastMeasured)
-						e.syncer.Resync(newM, int(e.offset))
+						e.syncer.Resync(newM)
 						lastMeasured = newM
 					}
 				}

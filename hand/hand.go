@@ -37,6 +37,11 @@ type MoveHand interface {
 // which is initially set from a reference value, and can be
 // updated by an external encoder tracking the actual physical
 // movement of the hand.
+// An offset may be provided that correlates the encoder mark reference point
+// and the actual physical location of the hand - when the hand is at the
+// encoder reference point, the offset represents the relative offset of the
+// physical clock hand e.g when the hand is at the encoder mark, the offset represents
+// the location of the hand as steps away from the top of the clock face.
 type Hand struct {
 	Name      string        // Name of this hand
 	Ticking   bool          // True if the clock has completed initialisation and is ticking.
@@ -48,6 +53,7 @@ type Hand struct {
 	actual    int           // Measured steps per revolution
 	divisor   int           // Used to calculate ticks
 	skipMove  int           // Minimum amount required to fast forward
+	offset	  int			// Offset of hand at encoder mark
 	mu        sync.Mutex    // Guards Current and actual
 	Resyncs  int            // Number of times resynced
 	Skipped   int			// Number of skipped moves
@@ -55,7 +61,7 @@ type Hand struct {
 }
 
 // NewHand creates and initialises a Hand structure.
-func NewHand(name string, unit time.Duration, mover MoveHand, update time.Duration, steps int) *Hand {
+func NewHand(name string, unit time.Duration, mover MoveHand, update time.Duration, steps, offset int) *Hand {
 	h := new(Hand)
 	h.Name = name
 	h.mover = mover
@@ -64,6 +70,7 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.divisor = int(update.Milliseconds())
 	h.reference = steps
 	h.actual = steps // Initial reference value
+	h.offset = offset
 	h.Current = 0
 	h.skipMove = steps / 100
 	log.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
@@ -81,13 +88,13 @@ func (h *Hand) Position() (int, int) {
 // Resync updates the steps per revolution and sets the current location.
 // An adjustment usually is derived from a sensor tracking the physical
 // movement of the hand.
-func (h *Hand) Resync(adj int, location int) {
+func (h *Hand) Resync(adj int) {
 	h.Resyncs++
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.actual = adj
 	// Reset the current location.
-	h.Current = location
+	h.Current = h.offset
 }
 
 // Run starts the ticking of the hand.
