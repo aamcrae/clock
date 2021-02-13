@@ -43,21 +43,21 @@ type MoveHand interface {
 // physical clock hand e.g when the hand is at the encoder mark, the offset represents
 // the location of the hand as steps away from the top of the clock face.
 type Hand struct {
-	Name      string        // Name of this hand
-	Ticking   bool          // True if the clock has completed initialisation and is ticking.
-	Current   int           // Current hand position
-	mover     MoveHand      // Mover to move the hand
-	update    time.Duration // Update interval
-	ticks     int           // Number of segments in clock face
-	reference int           // Reference steps per clock revolution
-	actual    int           // Measured steps per revolution
-	divisor   int           // Used to calculate ticks
-	skipMove  int           // Minimum amount required to fast forward
-	offset	  int			// Offset of hand at encoder mark
-	mu        sync.Mutex    // Guards Current and actual
-	Marks     int           // Number of times encoder mark hit
-	Skipped   int			// Number of skipped moves
-	FastForward int			// Number of fast forward movements
+	Name        string        // Name of this hand
+	Ticking     bool          // True if the clock has completed initialisation and is ticking.
+	Current     int           // Current hand position
+	mover       MoveHand      // Mover to move the hand
+	update      time.Duration // Update interval
+	ticks       int           // Number of segments in clock face
+	reference   int           // Reference steps per clock revolution
+	actual      int           // Measured steps per revolution
+	divisor     int           // Used to calculate ticks
+	skipMove    int           // Minimum amount required to fast forward
+	offset      int           // Offset of hand at encoder mark
+	mu          sync.Mutex    // Guards Current and actual
+	Marks       int           // Number of times encoder mark hit
+	Skipped     int           // Number of skipped moves
+	FastForward int           // Number of fast forward movements
 }
 
 // NewHand creates and initialises a Hand structure.

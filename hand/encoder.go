@@ -44,7 +44,7 @@ const mAvgCount = 5
 // number of steps in a rotation between encoder signals, and
 // this is used to calculate the actual number of steps in a revolution.
 type Encoder struct {
-	Name	 string
+	Name     string
 	getStep  GetStep
 	syncer   Syncer
 	enc      IO    // I/O from encoder hardware
