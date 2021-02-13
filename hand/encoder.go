@@ -20,18 +20,15 @@ import (
 	"log"
 )
 
-// Percentage range for sanity checking new adjustment value.
-const adjustBound = 10
-
 // GetStep provides a method to read the absolute location of the stepper motor.
 type GetStep interface {
 	GetStep() int64
 }
 
-// Syncer provides an interface to update the measured number of steps
-// in a revolution of a hand.
+// Syncer provides an interface for a callback when the encoder mark is hit.
+// The measured steps in a revolution is provided.
 type Syncer interface {
-	Resync(int)
+	Mark(int)
 }
 
 // IO provides a method to return when an input changes.
@@ -40,6 +37,7 @@ type IO interface {
 }
 
 const debounce = 5
+const mAvgCount = 5
 
 // Encoder is an interrupter encoder driver used to measure shaft rotations.
 // The count of current step values is used to track the
@@ -83,6 +81,9 @@ func (e *Encoder) driver() {
 	last := int64(0)
 	e.lastEdge = int64(-1)
 	lastMeasured := 0
+	var mavg []int
+	avgTotal := 0
+	avgIndex := 0
 	for {
 		// Retrieve the sensor value when it changes.
 		s, err := e.enc.Get()
@@ -109,20 +110,21 @@ func (e *Encoder) driver() {
 				// mark and the previous mark.
 				// This is the measured number of steps in a revolution.
 				newM := int(diff(e.lastEdge, loc))
-				if lastMeasured != newM {
-					// Check it is within the maximum allowed range
-					b := lastMeasured * adjustBound / 100
-					if lastMeasured != 0 && (newM < (lastMeasured - b) || ((lastMeasured + b) < newM)) {
-						log.Printf("%s: Resync out of range: %d (old %d)", e.Name, newM, lastMeasured)
-					} else {
-						e.Measured = newM
-						// If the number of steps in a revolution has
-						// changed, update the interested party.
-						log.Printf("%s: Resync to %d (%d)", e.Name, e.Measured, e.Measured-lastMeasured)
-						e.syncer.Resync(newM)
-						lastMeasured = newM
+				if avgTotal == 0 {
+					// If first time, init moving average.
+					for i := 0; i < mAvgCount; i++ {
+						mavg = append(mavg, newM)
 					}
+					avgTotal = newM * mAvgCount
 				}
+				// Recalculate moving average.
+				avgTotal = avgTotal - mavg[avgIndex] + newM
+				avgIndex = (avgIndex + 1) % mAvgCount
+				newM = avgTotal / mAvgCount
+				e.Measured = newM
+				e.syncer.Mark(newM)
+				log.Printf("%s: Mark at %d (%d)", e.Name, e.Measured, e.Measured-lastMeasured)
+				lastMeasured = newM
 			}
 			e.lastEdge = loc
 		}

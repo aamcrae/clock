@@ -55,7 +55,7 @@ type Hand struct {
 	skipMove  int           // Minimum amount required to fast forward
 	offset	  int			// Offset of hand at encoder mark
 	mu        sync.Mutex    // Guards Current and actual
-	Resyncs  int            // Number of times resynced
+	Marks     int           // Number of times encoder mark hit
 	Skipped   int			// Number of skipped moves
 	FastForward int			// Number of fast forward movements
 }
@@ -77,19 +77,35 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	return h
 }
 
-// Position returns the current relative position as well as the
+// Set sets the current location of the hand.
+func (h *Hand) Set(pos int) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.Current = pos % h.actual
+}
+
+// Get returns the current relative position as well as the
 // number of steps in a revolution.
-func (h *Hand) Position() (int, int) {
+func (h *Hand) Get() (int, int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.Current, h.actual
 }
 
-// Resync updates the steps per revolution and sets the current location.
+// Adjust adjusts the offset so that the physical location can be tweaked.
+func (h *Hand) Adjust(adj int) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.offset = (h.offset + adj) % h.actual
+	// Also apply the adjustment to the current location.
+	h.Current = (h.Current + adj) % h.actual
+}
+
+// Mark updates the steps per revolution and sets the current location to a known point.
 // An adjustment usually is derived from a sensor tracking the physical
 // movement of the hand.
-func (h *Hand) Resync(adj int) {
-	h.Resyncs++
+func (h *Hand) Mark(adj int) {
+	h.Marks++
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.actual = adj

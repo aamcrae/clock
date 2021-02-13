@@ -193,10 +193,8 @@ func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	}
 	// Move to encoder reference position.
 	loc := e.Location()
-	steps := e.Measured - loc
-	log.Printf("%s: Calibration complete (%d steps), moving to encoder mark (%d steps)", h.Name, e.Measured, steps)
-	h.mover.Move(steps)
-	log.Printf("%s: Ready to start hand", h.Name)
+	h.Set(loc)
+	log.Printf("%s: Calibration complete (%d steps), current position: %d", h.Name, e.Measured, loc)
 	if run {
 		h.Run()
 	}

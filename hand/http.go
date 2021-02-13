@@ -90,7 +90,7 @@ func handler(clock []*Hand, img image.Image) func(http.ResponseWriter, *http.Req
 }
 
 func drawHand(c *gg.Context, h *Hand, length, width int) {
-	p, r := h.Position()
+	p, r := h.Get()
 	p = r - p
 	radians := float64(p)*2*math.Pi/float64(r) + math.Pi
 	x := float64(length)*math.Sin(radians) + float64(midX)
@@ -111,8 +111,8 @@ func status(clock []*Hand) func(http.ResponseWriter, *http.Request) {
 		fmt.Fprintf(w, "</head><body><h1>Status</h1>")
 		for _, h := range clock {
 			fmt.Fprintf(w, "%s: ", h.Name)
-			p, r := h.Position()
-			fmt.Fprintf(w, "position: %d face size: %d (resyncs: %d, skipped: %d, fast-forwards %d)<br>", p, r, h.Resyncs, h.Skipped, h.FastForward)
+			p, r := h.Get()
+			fmt.Fprintf(w, "position: %d face size: %d (marks: %d, skipped: %d, fast-forwards %d)<br>", p, r, h.Marks, h.Skipped, h.FastForward)
 		}
 		fmt.Fprintf(w, "<p><a href=\"clock.jpg\">clock face</a><br>")
 		fmt.Fprintf(w, "</body>")

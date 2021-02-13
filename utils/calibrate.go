@@ -50,8 +50,14 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	enc := clk.Encoder
 	var steps int
+	current := enc.Location()
+	measured := enc.Measured
+	steps = hc.Offset - current
+	fmt.Printf("Moving to midnight position (%d steps)\n", steps)
+	clk.Move(steps)
+	current = hc.Offset
 	for {
-		fmt.Printf("Location %d (size %d), encoder mark offset %d\n", enc.Location(), enc.Measured, diff(0, enc.Location(), enc.Measured))
+		fmt.Printf("Location %d (size %d)\n", current, measured)
 		fmt.Print("Enter steps or command ('help' for help) ")
 		text, _ := reader.ReadString('\n')
 		text = strings.TrimSuffix(text, "\n")
@@ -59,19 +65,14 @@ func main() {
 		case "help":
 			fmt.Println("  help - print help")
 			fmt.Println("  [-]NNN move steps")
-			fmt.Println("  m - move to encoder mark")
-			fmt.Println("  o - move to configured offset")
 			fmt.Println("  q - quit")
 		case "q":
 			return
-		case "m":
-			fmt.Printf("Move to encoder mark from %d\n", enc.Location())
-			steps = enc.Measured - enc.Location()
-			clk.Move(steps)
 		case "o":
-			fmt.Printf("Move to offset (%d) from %d\n", hc.Offset, enc.Location())
-			steps = diff(enc.Location(), hc.Offset, enc.Measured)
+			fmt.Printf("Move to original midnight (%d) from %d\n", hc.Offset, current)
+			steps = hc.Offset - current
 			clk.Move(steps)
+			current += steps
 		default:
 			n, err := fmt.Sscanf(text, "%d", &steps)
 			if err != nil || n != 1 {
@@ -79,6 +80,7 @@ func main() {
 			} else {
 				fmt.Printf("Moving %d steps\n", steps)
 				clk.Move(steps)
+				current += steps
 			}
 		}
 	}
