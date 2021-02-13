@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Simulator clock program
+// clock simulator program
 
 package main
 
@@ -27,6 +27,10 @@ import (
 	"github.com/aamcrae/clock/hand"
 )
 
+// Simulator framework for 1 hand.
+// The input to the encoder is simulated via a channel that
+// has values sent to it when the simulated stepper steps past the
+// edges of an encoder mark.
 type SimHand struct {
 	hand         *hand.Hand
 	encoder      *hand.Encoder
@@ -39,15 +43,16 @@ type SimHand struct {
 	actual       float64
 }
 
+// Hand parameters
 var params = []struct {
-	name           string
-	period, update time.Duration
-	reference      int
-	perstep        float64
-	edge1          int
-	edge2          int
-	offset         int
-	units          int
+	name           string        // Name of hand
+	period, update time.Duration // Period of 1 revolution
+	reference      int           // Reference steps per revolution
+	perstep        float64       // factor for actual steps
+	edge1          int           // Position of encoder mark edge 0->1
+	edge2          int           // Position of encoder mark edge 1->0
+	offset         int           // Offset of hand
+	units          int           // Units of hand
 }{
 	{"hours", 12 * time.Hour, 1 * time.Minute, 4096, 1.003884, 2000, 2199, 1, 12},
 	{"minutes", time.Hour, 2 * time.Second, 5123, 1.01234, 3000, 3399, 0, 60},
@@ -101,6 +106,8 @@ func main() {
 	}
 }
 
+// Pos writes the current value of the hand as determined from
+// the hand position on the dial.
 func (s *SimHand) Pos(w io.Writer, offs, units int) int {
 	p, r := s.hand.Get()
 	v := p * units / r
@@ -108,6 +115,8 @@ func (s *SimHand) Pos(w io.Writer, offs, units int) int {
 	return v
 }
 
+// Create and initialise a hand simulator, and
+// start it running.
 func sim(index int) *SimHand {
 	p := &params[index]
 	sh := new(SimHand)
@@ -125,8 +134,11 @@ func sim(index int) *SimHand {
 }
 
 // Move acts like a stepper motor, moving the hand
-// one step at a time, and checking whether the hand
-// crosses an encoder edge.
+// one step at a time, and checking whether the encoder mark
+// is triggered. The actual size of each step is not integral to
+// simulate a hand revolution that's not exactly an integral size.
+// The idea is that the encoder will correct the revolution size
+// so that errors do not build up.
 func (s *SimHand) Move(steps int) {
 	var e1, e2 int
 	var inc float64
