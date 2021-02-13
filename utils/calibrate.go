@@ -50,14 +50,14 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	enc := clk.Encoder
 	var steps int
-	current := enc.Location()
 	measured := enc.Measured
-	steps = hc.Offset - current
-	fmt.Printf("Moving to midnight position (%d steps)\n", steps)
+	current := enc.Location()
+	steps = diff(measured-hc.Offset, current, measured)
+	fmt.Printf("Moving to midnight position (%d steps, %d current, %d offset)\n", steps, current, hc.Offset)
 	clk.Move(steps)
-	current = hc.Offset
+	current = (current + steps) % measured
 	for {
-		fmt.Printf("Location %d (size %d)\n", current, measured)
+		fmt.Printf("Location %d (size %d) - offset is %d\n", current, measured, measured-current)
 		fmt.Print("Enter steps or command ('help' for help) ")
 		text, _ := reader.ReadString('\n')
 		text = strings.TrimSuffix(text, "\n")
@@ -72,7 +72,7 @@ func main() {
 			fmt.Printf("Move to original midnight (%d) from %d\n", hc.Offset, current)
 			steps = hc.Offset - current
 			clk.Move(steps)
-			current += steps
+			current = (current + steps) % measured
 		default:
 			n, err := fmt.Sscanf(text, "%d", &steps)
 			if err != nil || n != 1 {
@@ -80,7 +80,7 @@ func main() {
 			} else {
 				fmt.Printf("Moving %d steps\n", steps)
 				clk.Move(steps)
-				current += steps
+				current = (current + steps) % measured
 			}
 		}
 	}
