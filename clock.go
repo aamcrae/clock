@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Clock program
+// Main clock program
 
 package main
 
@@ -33,6 +33,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("%s: %v", *configFile, err)
 	}
+	// Read the configs for each of the hands, and create
+	// a ClockHand for each config that is found.
 	var clock []*hand.ClockHand
 	for _, sect := range []string{"hours", "minutes", "seconds"} {
 		hc, err := hand.Config(conf, sect)
@@ -46,12 +48,15 @@ func main() {
 		}
 		clock = append(clock, c)
 	}
+	// Start the clock hands.
 	for _, c := range clock {
 		go c.Run()
 	}
 	if len(clock) == 0 {
 		log.Fatalf("No clock hands to run!")
 	}
+	// Start a status server that can display a clock face reflecting the
+	// status of the clock.
 	if *port != 0 {
 		var hands []*hand.Hand
 		for _, c := range clock {

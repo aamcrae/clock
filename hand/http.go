@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // HTTP server for clock images
+
 package hand
 
 import (
@@ -89,6 +90,8 @@ func handler(clock []*Hand, img image.Image) func(http.ResponseWriter, *http.Req
 	}
 }
 
+// Draw a hand onto the image using the requested length and width.
+// The positon of the hand is determined from the current physical hand location.
 func drawHand(c *gg.Context, h *Hand, length, width int) {
 	p, r := h.Get()
 	p = r - p

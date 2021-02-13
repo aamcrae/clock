@@ -23,24 +23,24 @@ import (
 	"github.com/aamcrae/gpio"
 )
 
-// Configuration data for the clock hand, read from a configuration file.
+// Configuration data for the clock hand, usually read from a configuration file.
 type ClockConfig struct {
-	Name    string
-	Gpio    []int
-	Speed   float64
-	Period  time.Duration
-	Update  time.Duration
-	Steps   int
-	Encoder int
-	Notch   int
-	Offset  int
+	Name    string        // Name of the hand
+	Gpio    []int         // Output pins for the stepper
+	Speed   float64       // Speed the stepper runs at (RPM)
+	Period  time.Duration // Period of the hand (e.g time.Hour)
+	Update  time.Duration // How often the hand updates.
+	Steps   int           // Initial reference steps per revolution
+	Encoder int           // Input pin for encoder
+	Notch   int           // Minimum width of encoder mark
+	Offset  int           // Hand offset from midnight to encoder mark
 }
 
 // ClockHand combines the I/O for a hand and an encoder.
 // A clock is comprised of multiple hands, each of which runs independently.
 // Each clock hand consists of a Hand which generates move requests according to the current time,
-// an Encoder which provides feedback as to the actual location of the hand, and the
-// I/O for these controllers.
+// an Encoder which provides feedback as to the actual location of the hand,
+// and the I/O providers for the Hand and Encoder.
 // A config for each hand is parsed from a configuration file.
 type ClockHand struct {
 	Stepper *io.Stepper
@@ -59,7 +59,7 @@ type ClockHand struct {
 //  steps=4096               # Reference number of steps in a revolution
 //  encoder=21               # GPIO for encoder
 //  notch=100                # Min width of sensor mark
-//  offset=2100              # The offset of the hand at the sensor mark
+//  offset=2100              # The offset of the hand at the encoder mark
 func Config(conf *config.Config, name string) (*ClockConfig, error) {
 	s := conf.GetSection(name)
 	if s == nil {
@@ -123,8 +123,7 @@ func Config(conf *config.Config, name string) (*ClockConfig, error) {
 	return &h, nil
 }
 
-// NewClockHand initialises the I/O, Hand, and Encoder from the
-// hand configuration.
+// NewClockHand initialises the I/O, Hand, and Encoder using the configuration provided.
 func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 	c := new(ClockHand)
 	c.Config = hc
@@ -161,13 +160,14 @@ func (c *ClockHand) Run() {
 
 // Move moves the stepper motor the steps indicated. This is a
 // shim between the hand and the stepper so that the motor can be
-// turned off between movements.
+// turned off between movements. Waits until the motor completes the
+// steps before returning.
+// TODO: Turning the motor off immediately will miss steps under load, so
+// some kind of delay is needed.
 func (c *ClockHand) Move(steps int) {
 	if c.Stepper != nil {
 		c.Stepper.Step(c.Config.Speed, steps)
 		c.Stepper.Wait()
-		//time.Sleep(50*time.Millisecond)
-		//c.Stepper.Off() // Turn stepper off between moves
 	}
 }
 
@@ -182,9 +182,8 @@ func (c *ClockHand) Close() {
 }
 
 // Calibrate moves the hand at least 4 revolutions to allow
-// the encoder to measure the actual steps for 360 degrees of movement.
-// Once that is known, the hand is moved to the encoder mark,
-// and this is considered the initial location for the hand.
+// the encoder to measure the actual steps for 360 degrees of movement, and
+// to discover the location of the encoder mark.
 func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	log.Printf("%s: Starting calibration", h.Name)
 	h.mover.Move(int(reference*4 + reference/2))
@@ -192,6 +191,7 @@ func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 		log.Fatalf("Unable to calibrate")
 	}
 	loc := e.Location()
+	// Set the current location of the hand.
 	h.Set(loc)
 	log.Printf("%s: Calibration complete (%d steps), current position: %d", h.Name, e.Measured, loc)
 	if run {

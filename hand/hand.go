@@ -22,21 +22,32 @@ import (
 	"time"
 )
 
-// MoveHand is the interface to move the clock hand.
+// MoveHand is the interface to move the hand by a selected number of steps.
 type MoveHand interface {
 	Move(int)
 }
 
 // Hand represents a clock hand. A single revolution of the hand
 // is represented by a number of ticks, determined by the update duration
-// for the hand.
+// for the hand e.g a minute hand takes 60 minutes for a revolution, and is
+// updated every 5 seconds (to make the motion smooth), so this hand has 720 ticks (60 * 60 / 5).
 // Ticking the clock involves moving the hand by one tick each update period.
-// Moving is done by sending a step count to a Mover.
-// Moving is only performed in a clockwise direction.
+// Ticks are not steps; a single tick is usually a number of steps.
+//
 // The number of steps in a single revolution is held in actual,
 // which is initially set from a reference value, and can be
 // updated by an external encoder tracking the actual physical
 // movement of the hand.
+//
+// Moving is done by calculating the step location of a tick, and then
+// sending a step count to a Mover to move the hand to the required step location.
+// E.g if there are 4000 steps in a revolution, and 720 ticks for a minute hand,
+// and the time is 17 minutes past the hour, this is tick 720 * 17 / 60 = 204.
+// The target step location for this tick is 4000 * 204 / 720 = 1133.
+// The current step number is used to determine how many steps the hand
+// needs to move to get to 1133.
+//
+// Moving is only performed in a clockwise direction.
 // An offset may be provided that correlates the encoder mark reference point
 // and the actual physical location of the hand - when the hand is at the
 // encoder reference point, the offset represents the relative offset of the
@@ -73,11 +84,11 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.offset = offset
 	h.Current = 0
 	h.skipMove = steps / 100
-	log.Printf("%s: ticks %d, reference steps %d, divisor %d\n", h.Name, h.ticks, h.reference, h.divisor)
+	log.Printf("%s: ticks %d, reference steps %d, divisor %d, offset %d\n", h.Name, h.ticks, h.reference, h.divisor, h.offset)
 	return h
 }
 
-// Set sets the current location of the hand, as measured from the
+// Set sets the initial location of the hand, as measured from the
 // encoder mark.
 func (h *Hand) Set(pos int) {
 	h.mu.Lock()
@@ -94,7 +105,7 @@ func (h *Hand) Get() (int, int) {
 	return h.Current, h.actual
 }
 
-// Adjust adjusts the offset so that the physical location can be tweaked.
+// Adjust adjusts the offset so that the physical position can be tweaked.
 func (h *Hand) Adjust(adj int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -103,9 +114,9 @@ func (h *Hand) Adjust(adj int) {
 	h.Current = (h.Current + adj) % h.actual
 }
 
-// Mark updates the steps per revolution and sets the current location to a known point.
-// An adjustment usually is derived from a sensor tracking the physical
-// movement of the hand.
+// Mark updates the steps per revolution and sets the current location to a preset value.
+// Usually called from a sensor encoder at the point when an encoder mark is detected, indicating
+// a known physical location of the hand.
 func (h *Hand) Mark(adj int) {
 	h.Marks++
 	h.mu.Lock()
@@ -117,14 +128,15 @@ func (h *Hand) Mark(adj int) {
 
 // Run starts the ticking of the hand.
 // The hand processing basically involves starting a ticker at the update
-// rate specified for the hand, and then moving the hand to match the time
-// the ticker sends.
+// rate specified for the hand, and then moving the hand to match the step location
+// correlating to the time value the ticker sends.
 func (h *Hand) Run() {
-	// Move the hand to the position representing the current time.
+	// Get the step location corresponding to the current time.
 	target := h.target(time.Now())
+	// Move the hand to the target location.
 	h.moveTo(target)
 	// Attempt to start a Ticker on the update boundary so that the ticker
-	// ticks on the time of the update interval.
+	// ticks as close as possible on the exact time of the update interval.
 	h.syncTime()
 	ticker := time.NewTicker(h.update)
 	h.Ticking = true
@@ -144,10 +156,12 @@ func (h *Hand) moveTo(target int) {
 	}
 }
 
-// steps returns the number of steps to move.
-// A small negative movement can arise if the steps per revolution change.
-// It is likely better to simply skip moving the hand to let the adjusted
-// time catch up; the alternative is to fast-forward the hand to the target point.
+// steps returns the number of steps to move
+// from the current position to the target position.
+// A small negative movement can arise if the steps per revolution is adjusted and the current location
+// is now slightly ahead of where it should be.
+// It is likely better to simply pause the hand to let time catch up;
+// the alternative is to fast-forward the hand to the target point.
 func (h *Hand) steps(target int) int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
