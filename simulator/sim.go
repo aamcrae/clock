@@ -102,7 +102,7 @@ func main() {
 }
 
 func (s *SimHand) Pos(w io.Writer, offs, units int) int {
-	p, r := s.hand.Position()
+	p, r := s.hand.Get()
 	v := p * units / r
 	fmt.Fprintf(w, "%02d", v)
 	return v

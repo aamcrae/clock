@@ -122,7 +122,7 @@ func (h *Hand) Mark(adj int) {
 func (h *Hand) Run() {
 	// Move the hand to the position representing the current time.
 	target := h.target(time.Now())
-	h.set(target)
+	h.moveTo(target)
 	// Attempt to start a Ticker on the update boundary so that the ticker
 	// ticks on the time of the update interval.
 	h.syncTime()
@@ -131,13 +131,13 @@ func (h *Hand) Run() {
 	for {
 		// Receive the time from the ticker, and set the hand to the
 		// target position calculated from the current time.
-		h.set(h.target(<-ticker.C))
+		h.moveTo(h.target(<-ticker.C))
 	}
 }
 
 // Set the hand to the target position.
 // Always move clockwise, to avoid encoder getting confused.
-func (h *Hand) set(target int) {
+func (h *Hand) moveTo(target int) {
 	st := h.steps(target)
 	if st > 0 {
 		h.mover.Move(st)
