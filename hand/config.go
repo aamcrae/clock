@@ -191,7 +191,6 @@ func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	if e.Measured == 0 {
 		log.Fatalf("Unable to calibrate")
 	}
-	// Move to encoder reference position.
 	loc := e.Location()
 	h.Set(loc)
 	log.Printf("%s: Calibration complete (%d steps), current position: %d", h.Name, e.Measured, loc)

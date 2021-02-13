@@ -77,11 +77,13 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	return h
 }
 
-// Set sets the current location of the hand.
+// Set sets the current location of the hand, as measured from the
+// encoder mark.
 func (h *Hand) Set(pos int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.Current = pos % h.actual
+	h.Current = (pos + h.offset) % h.actual
+	log.Printf("%s: Setting hand to encoder offset %d (location %d)", h.Name, pos, h.Current)
 }
 
 // Get returns the current relative position as well as the
