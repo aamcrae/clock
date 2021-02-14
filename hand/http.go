@@ -93,7 +93,7 @@ func handler(clock []*Hand, img image.Image) func(http.ResponseWriter, *http.Req
 // Draw a hand onto the image using the requested length and width.
 // The positon of the hand is determined from the current physical hand location.
 func drawHand(c *gg.Context, h *Hand, length, width int) {
-	p, r := h.Get()
+	p, r, _ := h.Get()
 	p = r - p
 	radians := float64(p)*2*math.Pi/float64(r) + math.Pi
 	x := float64(length)*math.Sin(radians) + float64(midX)
@@ -114,8 +114,8 @@ func status(clock []*Hand) func(http.ResponseWriter, *http.Request) {
 		fmt.Fprintf(w, "</head><body><h1>Status</h1>")
 		for _, h := range clock {
 			fmt.Fprintf(w, "%s: ", h.Name)
-			p, r := h.Get()
-			fmt.Fprintf(w, "position: %d face size: %d (marks: %d, skipped: %d, fast-forwards %d)<br>", p, r, h.Marks, h.Skipped, h.FastForward)
+			p, r, o := h.Get()
+			fmt.Fprintf(w, "position: %d offset: %d face size: %d (marks: %d, skipped: %d, fast-forwards %d, adjusted %d)<br>", p, o, r, h.Marks, h.Skipped, h.FastForward, h.Adjusted)
 		}
 		fmt.Fprintf(w, "<p><a href=\"clock.jpg\">clock face</a><br>")
 		fmt.Fprintf(w, "</body>")

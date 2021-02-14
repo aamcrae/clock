@@ -171,8 +171,8 @@ func (c *ClockHand) Move(steps int) {
 	}
 }
 
-// Get returns the current absolute location.
-func (c *ClockHand) Get() int64 {
+// GetLocation returns the current absolute location.
+func (c *ClockHand) GetLocation() int64 {
 	return c.Stepper.GetStep()
 }
 

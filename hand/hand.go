@@ -25,7 +25,7 @@ import (
 // MoveHand is the interface to move the hand by a selected number of steps.
 type MoveHand interface {
 	Move(int)
-	Get() int64		// Get current position
+	GetLocation() int64 // Get current location
 }
 
 // Hand represents a clock hand. A single revolution of the hand
@@ -57,7 +57,7 @@ type MoveHand interface {
 type Hand struct {
 	Name        string        // Name of this hand
 	Ticking     bool          // True if the clock has completed initialisation and is ticking.
-	base		int64		  // Base position
+	base        int64         // position of last encoder mark
 	mover       MoveHand      // Mover to move the hand
 	update      time.Duration // Update interval
 	ticks       int           // Number of segments in clock face
@@ -70,6 +70,7 @@ type Hand struct {
 	Marks       int           // Number of times encoder mark hit
 	Skipped     int           // Number of skipped moves
 	FastForward int           // Number of fast forward movements
+	Adjusted    int           // Number of hand adjustments
 }
 
 // NewHand creates and initialises a Hand structure.
@@ -88,21 +89,30 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	return h
 }
 
-// Get returns the current relative position as well as the
-// number of steps in a revolution.
-func (h *Hand) Get() (int, int) {
+// Get returns the current relative position,
+// the number of steps in a revolution, and
+// the current offset.
+func (h *Hand) Get() (int, int, int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.getCurrent(), h.actual
+	return h.getCurrent(), h.actual, h.offset
 }
 
 // Adjust adjusts the offset so that the physical position can be tweaked.
-func (h *Hand) Adjust(adj int) {
+// A positive value reduces the offset so that the hand is closer to the
+// encoder mark. The initial offset in the configuration should also
+// be adjusted.
+func (h *Hand) Adjust(adj int) int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.offset = (h.offset + adj) % h.actual
-	// Also apply the adjustment to the current location.
-	//h.Current = (h.Current + adj) % h.actual
+	h.Adjusted++
+	h.offset -= adj
+	if h.offset < 0 {
+		h.offset += h.actual
+	} else {
+		h.offset %= h.actual
+	}
+	return h.offset
 }
 
 // Mark updates the steps per revolution and sets the current location to a preset value.
@@ -119,7 +129,7 @@ func (h *Hand) Mark(adj int, loc int64) {
 
 // Calculate the current location of the hand.
 func (h *Hand) getCurrent() int {
-	return (int(h.mover.Get() - h.base) + h.offset) % h.actual
+	return (int(h.mover.GetLocation()-h.base) + h.offset) % h.actual
 }
 
 // Run starts the ticking of the hand.

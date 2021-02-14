@@ -51,12 +51,12 @@ var params = []struct {
 	perstep        float64       // factor for actual steps
 	edge1          int           // Position of encoder mark edge 0->1
 	edge2          int           // Position of encoder mark edge 1->0
-	offset         int           // Offset of hand
+	offset         int           // Offset of hand from encoder
 	units          int           // Units of hand
 }{
-	{"hours", 12 * time.Hour, 1 * time.Minute, 4096, 1.003884, 2000, 2199, 1, 12},
-	{"minutes", time.Hour, 2 * time.Second, 5123, 1.01234, 3000, 3399, 0, 60},
-	{"seconds", time.Minute, 100 * time.Millisecond, 4017, 0.995654, 1500, 1599, 0, 60},
+	{"hours", 12 * time.Hour, 1 * time.Minute, 4096, 1.003884, 2000, 2199, 1000, 12},
+	{"minutes", time.Hour, 2 * time.Second, 5123, 1.01234, 3000, 3399, 2000, 60},
+	{"seconds", time.Minute, 100 * time.Millisecond, 4017, 0.995654, 1500, 1599, 3000, 60},
 }
 
 const threshold = time.Millisecond * 50
@@ -92,7 +92,7 @@ func main() {
 		var b strings.Builder
 		var val [3]int
 		for i, h := range hands {
-			val[i] = h.Pos(&b, params[i].offset, params[i].units)
+			val[i] = h.Pos(&b, params[i].units)
 			fmt.Fprintf(&b, ":")
 		}
 		now := time.Now()
@@ -108,8 +108,8 @@ func main() {
 
 // Pos writes the current value of the hand as determined from
 // the hand position on the dial.
-func (s *SimHand) Pos(w io.Writer, offs, units int) int {
-	p, r := s.hand.Get()
+func (s *SimHand) Pos(w io.Writer, units int) int {
+	p, r, _ := s.hand.Get()
 	v := p * units / r
 	fmt.Fprintf(w, "%02d", v)
 	return v
@@ -127,7 +127,7 @@ func sim(index int) *SimHand {
 	sh.actual = float64(p.reference) * p.perstep
 	sh.edge1 = p.edge1
 	sh.edge2 = p.edge2
-	sh.hand = hand.NewHand(p.name, p.period, sh, p.update, p.reference, 0)
+	sh.hand = hand.NewHand(p.name, p.period, sh, p.update, p.reference, p.offset)
 	sh.encoder = hand.NewEncoder(p.name, sh, sh.hand, sh, (p.edge2-p.edge1+1)/2)
 	go hand.Calibrate(true, sh.encoder, sh.hand, p.reference)
 	return sh
@@ -163,6 +163,11 @@ func (s *SimHand) Move(steps int) {
 		}
 		time.Sleep(time.Millisecond)
 	}
+}
+
+// GetLocation returns the current step location
+func (s *SimHand) GetLocation() int64 {
+	return s.GetStep()
 }
 
 // GetStep returns the current step location
