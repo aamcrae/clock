@@ -28,7 +28,7 @@ type GetStep interface {
 // Syncer provides an interface for a callback when the encoder mark is hit.
 // The measured steps in a revolution is provided.
 type Syncer interface {
-	Mark(int)
+	Mark(int, int64)
 }
 
 // IO provides a method to return when an input changes.
@@ -122,7 +122,7 @@ func (e *Encoder) driver() {
 				avgIndex = (avgIndex + 1) % mAvgCount
 				newM = avgTotal / mAvgCount
 				e.Measured = newM
-				e.syncer.Mark(newM)
+				e.syncer.Mark(newM, loc)
 				log.Printf("%s: Mark at %d (%d)", e.Name, e.Measured, e.Measured-lastMeasured)
 				lastMeasured = newM
 			}

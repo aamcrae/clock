@@ -171,6 +171,11 @@ func (c *ClockHand) Move(steps int) {
 	}
 }
 
+// Get returns the current absolute location.
+func (c *ClockHand) Get() int64 {
+	return c.Stepper.GetStep()
+}
+
 // Close shuts down the clock hand and release the resources.
 func (c *ClockHand) Close() {
 	if c.Stepper != nil {
@@ -190,10 +195,7 @@ func Calibrate(run bool, e *Encoder, h *Hand, reference int) {
 	if e.Measured == 0 {
 		log.Fatalf("Unable to calibrate")
 	}
-	loc := e.Location()
-	// Set the current location of the hand.
-	h.Set(loc)
-	log.Printf("%s: Calibration complete (%d steps), current position: %d", h.Name, e.Measured, loc)
+	log.Printf("%s: Calibration complete (%d steps), encoder: %d", h.Name, e.Measured, e.Location())
 	if run {
 		h.Run()
 	}

@@ -25,6 +25,7 @@ import (
 // MoveHand is the interface to move the hand by a selected number of steps.
 type MoveHand interface {
 	Move(int)
+	Get() int64		// Get current position
 }
 
 // Hand represents a clock hand. A single revolution of the hand
@@ -56,7 +57,7 @@ type MoveHand interface {
 type Hand struct {
 	Name        string        // Name of this hand
 	Ticking     bool          // True if the clock has completed initialisation and is ticking.
-	Current     int           // Current hand position
+	base		int64		  // Base position
 	mover       MoveHand      // Mover to move the hand
 	update      time.Duration // Update interval
 	ticks       int           // Number of segments in clock face
@@ -65,7 +66,7 @@ type Hand struct {
 	divisor     int           // Used to calculate ticks
 	skipMove    int           // Minimum amount required to fast forward
 	offset      int           // Offset of hand at encoder mark
-	mu          sync.Mutex    // Guards Current and actual
+	mu          sync.Mutex    // Guards base and actual
 	Marks       int           // Number of times encoder mark hit
 	Skipped     int           // Number of skipped moves
 	FastForward int           // Number of fast forward movements
@@ -82,19 +83,9 @@ func NewHand(name string, unit time.Duration, mover MoveHand, update time.Durati
 	h.reference = steps
 	h.actual = steps // Initial reference value
 	h.offset = offset
-	h.Current = 0
 	h.skipMove = steps / 100
 	log.Printf("%s: ticks %d, reference steps %d, divisor %d, offset %d\n", h.Name, h.ticks, h.reference, h.divisor, h.offset)
 	return h
-}
-
-// Set sets the initial location of the hand, as measured from the
-// encoder mark.
-func (h *Hand) Set(pos int) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.Current = (pos + h.offset) % h.actual
-	log.Printf("%s: Setting hand to encoder offset %d (location %d)", h.Name, pos, h.Current)
 }
 
 // Get returns the current relative position as well as the
@@ -102,7 +93,7 @@ func (h *Hand) Set(pos int) {
 func (h *Hand) Get() (int, int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.Current, h.actual
+	return h.getCurrent(), h.actual
 }
 
 // Adjust adjusts the offset so that the physical position can be tweaked.
@@ -111,19 +102,24 @@ func (h *Hand) Adjust(adj int) {
 	defer h.mu.Unlock()
 	h.offset = (h.offset + adj) % h.actual
 	// Also apply the adjustment to the current location.
-	h.Current = (h.Current + adj) % h.actual
+	//h.Current = (h.Current + adj) % h.actual
 }
 
 // Mark updates the steps per revolution and sets the current location to a preset value.
 // Usually called from a sensor encoder at the point when an encoder mark is detected, indicating
 // a known physical location of the hand.
-func (h *Hand) Mark(adj int) {
+func (h *Hand) Mark(adj int, loc int64) {
 	h.Marks++
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.actual = adj
 	// Reset the current location.
-	h.Current = h.offset
+	h.base = loc
+}
+
+// Calculate the current location of the hand.
+func (h *Hand) getCurrent() int {
+	return (int(h.mover.Get() - h.base) + h.offset) % h.actual
 }
 
 // Run starts the ticking of the hand.
@@ -134,6 +130,7 @@ func (h *Hand) Run() {
 	// Get the step location corresponding to the current time.
 	target := h.target(time.Now())
 	// Move the hand to the target location.
+	log.Printf("%s: Initial target %d, current %d", h.Name, target, h.getCurrent())
 	h.moveTo(target)
 	// Attempt to start a Ticker on the update boundary so that the ticker
 	// ticks as close as possible on the exact time of the update interval.
@@ -166,11 +163,12 @@ func (h *Hand) steps(target int) int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	// Get difference between target and current location.
-	st := target - h.Current
+	cur := h.getCurrent()
+	st := target - cur
 	if st < 0 {
 		if -st < h.skipMove {
 			h.Skipped++
-			log.Printf("%s: Skipping move (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
+			log.Printf("%s: Skipping move (%d steps, %d current, %d target, %d actual)", h.Name, st, cur, target, h.actual)
 			return 0
 		}
 		// Convert backwards move to forward move around the clock.
@@ -178,10 +176,8 @@ func (h *Hand) steps(target int) int {
 	}
 	if st > h.skipMove {
 		h.FastForward++
-		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual)", h.Name, st, h.Current, target, h.actual)
+		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual)", h.Name, st, cur, target, h.actual)
 	}
-	// Update the current location to where the hand will be after the movement.
-	h.Current = (st + h.Current) % h.actual
 	return st
 }
 
