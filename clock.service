@@ -1,0 +1,16 @@
+[Unit]
+Description=Mechanical clock
+After=network.target
+
+[Service]
+User=root
+Type=simple
+TimeoutStopSec=10
+ExecStart=/usr/local/bin/clock --config=/etc/clock.conf --clockface /etc/clock-face.jpg
+
+Restart=on-failure
+RestartSec=15s
+SuccessExitStatus=SIGKILL
+
+[Install]
+WantedBy=default.target
