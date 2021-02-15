@@ -160,6 +160,7 @@ func adjust(clock []*Hand) func(http.ResponseWriter, *http.Request) {
 		h.Adjust(int(v))
 		p, _, o = h.Get()
 		fmt.Fprintf(w, "%s: new offset: %d, position %d<br>", h.Name, o, p)
+		log.Printf("%s: Adjusted offset by %d to %d", v, o)
 		fmt.Fprintf(w, "</body>")
 	}
 }
