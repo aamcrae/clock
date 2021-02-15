@@ -25,6 +25,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/fogleman/gg"
 )
@@ -63,6 +64,7 @@ func ClockServer(port int, clock []*Hand) {
 	}
 	http.Handle("/clock.jpg", http.HandlerFunc(handler(clock, img)))
 	http.Handle("/status", http.HandlerFunc(status(clock)))
+	http.Handle("/adjust", http.HandlerFunc(adjust(clock)))
 	url := fmt.Sprintf(":%d", port)
 	log.Printf("Starting server on %s", url)
 	server := &http.Server{Addr: url}
@@ -118,6 +120,46 @@ func status(clock []*Hand) func(http.ResponseWriter, *http.Request) {
 			fmt.Fprintf(w, "position: %d offset: %d face size: %d (marks: %d, skipped: %d, fast-forwards %d, adjusted %d)<br>", p, o, r, h.Marks, h.Skipped, h.FastForward, h.Adjusted)
 		}
 		fmt.Fprintf(w, "<p><a href=\"clock.jpg\">clock face</a><br>")
+		fmt.Fprintf(w, "</body>")
+	}
+}
+
+// adjust applies an adjustment to the hand offset.
+// URL parameters are hand=[name] adjust=[value]
+func adjust(clock []*Hand) func(http.ResponseWriter, *http.Request) {
+	hm := make(map[string]*Hand)
+	for _, c := range clock {
+		hm[c.Name] = c
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := r.ParseForm()
+		if err != nil {
+			log.Printf("Adjust request error: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		hand := r.FormValue("hand")
+		adj := r.FormValue("adjust")
+		h, ok := hm[hand]
+		if !ok {
+			log.Printf("Unknown hand: %s", hand)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		v, err := strconv.ParseInt(adj, 10, 32)
+		if err != nil {
+			log.Printf("Illegal value: %s - %v", adj, err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, "<html><head>")
+		fmt.Fprintf(w, "</head><body>")
+		p, _, o := h.Get()
+		fmt.Fprintf(w, "%s: current offset: %d, position %d<br>", h.Name, o, p)
+		h.Adjust(int(v))
+		p, _, o = h.Get()
+		fmt.Fprintf(w, "%s: new offset: %d, position %d<br>", h.Name, o, p)
 		fmt.Fprintf(w, "</body>")
 	}
 }

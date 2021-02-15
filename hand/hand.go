@@ -186,7 +186,7 @@ func (h *Hand) steps(target int) int {
 	}
 	if st > h.skipMove {
 		h.FastForward++
-		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual)", h.Name, st, cur, target, h.actual)
+		log.Printf("%s: Fast foward (%d steps, %d current, %d target, %d actual, %d base)", h.Name, st, cur, target, h.actual, h.base)
 	}
 	return st
 }
