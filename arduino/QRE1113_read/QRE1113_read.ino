@@ -1,7 +1,7 @@
 
 #include "limits.h"
 
-#define INPUT 0
+#define INPUT 1
 int last = 0;
 int lowest = INT_MAX;
 int highest = 0;

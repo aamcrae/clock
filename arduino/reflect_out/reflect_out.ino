@@ -1,4 +1,8 @@
-
+/*
+ *  Program to read analog inputs, apply some hysteresis, and set an output
+ *  GPIO to 0 or 1 depending on the level.
+ *  TODO: Maybe should try self-calibration.
+ */
 #define INP0 0
 #define INP1 1
 #define INP2 2
@@ -27,9 +31,9 @@ void setup()
 
 void loop()
 {
-  reflect(INP0, OUT0, &last0, 100, 230);
-  reflect(INP1, OUT1, &last1, 100, 200);
-  reflect(INP2, OUT2, &last2, 100, 300);
+  reflect(INP0, OUT0, &last0, 230, 580);
+  reflect(INP1, OUT1, &last1, 206, 500);
+  //reflect(INP2, OUT2, &last2, 100, 300);
   counter++;
   if (counter == DELAY) {
     digitalWrite(LED, HIGH);
