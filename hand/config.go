@@ -21,6 +21,7 @@ import (
 
 	"github.com/aamcrae/config"
 	"github.com/aamcrae/gpio"
+	"github.com/aamcrae/gpio/action"
 )
 
 // Configuration data for the clock hand, usually read from a configuration file.
@@ -43,7 +44,7 @@ type ClockConfig struct {
 // and the I/O providers for the Hand and Encoder.
 // A config for each hand is parsed from a configuration file.
 type ClockHand struct {
-	Stepper *io.Stepper
+	Stepper *action.Stepper
 	Input   *io.Gpio
 	Hand    *Hand
 	Encoder *Encoder
@@ -135,7 +136,7 @@ func NewClockHand(hc *ClockConfig) (*ClockHand, error) {
 			return nil, fmt.Errorf("Pin %d: %v", v, err)
 		}
 	}
-	c.Stepper = io.NewStepper(hc.Steps, gp[0], gp[1], gp[2], gp[3])
+	c.Stepper = action.NewStepper(hc.Steps, gp[0], gp[1], gp[2], gp[3])
 	c.Hand = NewHand(hc.Name, hc.Period, c, hc.Update, int(hc.Steps), hc.Offset)
 	c.Input, err = io.Pin(hc.Encoder)
 	if err != nil {
